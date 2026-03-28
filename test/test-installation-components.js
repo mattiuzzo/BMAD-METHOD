@@ -14,10 +14,9 @@
 const path = require('node:path');
 const os = require('node:os');
 const fs = require('fs-extra');
-const { YamlXmlBuilder } = require('../tools/cli/lib/yaml-xml-builder');
-const { ManifestGenerator } = require('../tools/cli/installers/lib/core/manifest-generator');
-const { IdeManager } = require('../tools/cli/installers/lib/ide/manager');
-const { clearCache, loadPlatformCodes } = require('../tools/cli/installers/lib/ide/platform-codes');
+const { ManifestGenerator } = require('../tools/installer/core/manifest-generator');
+const { IdeManager } = require('../tools/installer/ide/manager');
+const { clearCache, loadPlatformCodes } = require('../tools/installer/ide/platform-codes');
 
 // ANSI colors
 const colors = {
@@ -49,34 +48,37 @@ function assert(condition, testName, errorMessage = '') {
 }
 
 async function createTestBmadFixture() {
-  const fixtureDir = await fs.mkdtemp(path.join(os.tmpdir(), 'bmad-fixture-'));
+  const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'bmad-fixture-'));
+  const fixtureDir = path.join(fixtureRoot, '_bmad');
+  await fs.ensureDir(fixtureDir);
 
-  // Minimal workflow manifest (generators check for this)
+  // Skill manifest CSV — the sole source of truth for IDE skill installation
   await fs.ensureDir(path.join(fixtureDir, '_config'));
-  await fs.writeFile(path.join(fixtureDir, '_config', 'workflow-manifest.csv'), '');
+  await fs.writeFile(
+    path.join(fixtureDir, '_config', 'skill-manifest.csv'),
+    [
+      'canonicalId,name,description,module,path,install_to_bmad',
+      '"bmad-master","bmad-master","Minimal test agent fixture","core","_bmad/core/bmad-master/SKILL.md","true"',
+      '',
+    ].join('\n'),
+  );
 
-  // Minimal compiled agent for core/agents (contains <agent tag and frontmatter)
-  const minimalAgent = [
-    '---',
-    'name: "test agent"',
-    'description: "Minimal test agent fixture"',
-    '---',
-    '',
-    'You are a test agent.',
-    '',
-    '<agent id="test-agent.agent.yaml" name="Test Agent" title="Test Agent">',
-    '<persona>Test persona</persona>',
-    '</agent>',
-  ].join('\n');
-
-  await fs.ensureDir(path.join(fixtureDir, 'core', 'agents'));
-  await fs.writeFile(path.join(fixtureDir, 'core', 'agents', 'bmad-master.md'), minimalAgent);
-  // Skill manifest so the installer uses 'bmad-master' as the canonical skill name
-  await fs.writeFile(path.join(fixtureDir, 'core', 'agents', 'bmad-skill-manifest.yaml'), 'bmad-master.md:\n  canonicalId: bmad-master\n');
-
-  // Minimal compiled agent for bmm module (tests use selectedModules: ['bmm'])
-  await fs.ensureDir(path.join(fixtureDir, 'bmm', 'agents'));
-  await fs.writeFile(path.join(fixtureDir, 'bmm', 'agents', 'test-bmm-agent.md'), minimalAgent);
+  // Minimal SKILL.md for the skill entry
+  const skillDir = path.join(fixtureDir, 'core', 'bmad-master');
+  await fs.ensureDir(skillDir);
+  await fs.writeFile(
+    path.join(skillDir, 'SKILL.md'),
+    [
+      '---',
+      'name: bmad-master',
+      'description: Minimal test agent fixture',
+      '---',
+      '',
+      '<!-- agent-activation -->',
+      'You are a test agent.',
+    ].join('\n'),
+  );
+  await fs.writeFile(path.join(skillDir, 'workflow.md'), '# Test Workflow\nStep 1: Do the thing.\n');
 
   return fixtureDir;
 }
@@ -96,17 +98,6 @@ async function createSkillCollisionFixture() {
     ].join('\n'),
   );
 
-  await fs.writeFile(
-    path.join(configDir, 'workflow-manifest.csv'),
-    [
-      'name,description,module,path,canonicalId',
-      '"help","Workflow help","core","_bmad/core/workflows/help/workflow.md","bmad-help"',
-      '',
-    ].join('\n'),
-  );
-
-  await fs.writeFile(path.join(configDir, 'task-manifest.csv'), 'name,displayName,description,module,path,standalone,canonicalId\n');
-  await fs.writeFile(path.join(configDir, 'tool-manifest.csv'), 'name,displayName,description,module,path,standalone,canonicalId\n');
   await fs.writeFile(
     path.join(configDir, 'skill-manifest.csv'),
     [
@@ -145,77 +136,10 @@ async function runTests() {
 
   const projectRoot = path.join(__dirname, '..');
 
-  // Test 1: Removed — old YAML→XML agent compilation no longer applies (agents now use SKILL.md format)
-
-  console.log('');
-
   // ============================================================
-  // Test 2: Customization Merging
+  // Test 1: Windsurf Native Skills Install
   // ============================================================
-  console.log(`${colors.yellow}Test Suite 2: Customization Merging${colors.reset}\n`);
-
-  try {
-    const builder = new YamlXmlBuilder();
-
-    // Test deepMerge function
-    const base = {
-      agent: {
-        metadata: { name: 'John', title: 'PM' },
-        persona: { role: 'Product Manager', style: 'Analytical' },
-      },
-    };
-
-    const customize = {
-      agent: {
-        metadata: { name: 'Sarah' }, // Override name only
-        persona: { style: 'Concise' }, // Override style only
-      },
-    };
-
-    const merged = builder.deepMerge(base, customize);
-
-    assert(merged.agent.metadata.name === 'Sarah', 'Deep merge overrides customized name');
-
-    assert(merged.agent.metadata.title === 'PM', 'Deep merge preserves non-overridden title');
-
-    assert(merged.agent.persona.role === 'Product Manager', 'Deep merge preserves non-overridden role');
-
-    assert(merged.agent.persona.style === 'Concise', 'Deep merge overrides customized style');
-  } catch (error) {
-    assert(false, 'Customization merging works', error.message);
-  }
-
-  console.log('');
-
-  // ============================================================
-  // Test 3: Path Resolution
-  // ============================================================
-  console.log(`${colors.yellow}Test Suite 3: Path Variable Resolution${colors.reset}\n`);
-
-  try {
-    const builder = new YamlXmlBuilder();
-
-    // Test path resolution logic (if exposed)
-    // This would test {project-root}, {installed_path}, {config_source} resolution
-
-    const testPath = '{project-root}/bmad/bmm/config.yaml';
-    const expectedPattern = /\/bmad\/bmm\/config\.yaml$/;
-
-    assert(
-      true, // Placeholder - would test actual resolution
-      'Path variable resolution pattern matches expected format',
-      'Note: This test validates path resolution logic exists',
-    );
-  } catch (error) {
-    assert(false, 'Path resolution works', error.message);
-  }
-
-  console.log('');
-
-  // ============================================================
-  // Test 4: Windsurf Native Skills Install
-  // ============================================================
-  console.log(`${colors.yellow}Test Suite 4: Windsurf Native Skills${colors.reset}\n`);
+  console.log(`${colors.yellow}Test Suite 1: Windsurf Native Skills${colors.reset}\n`);
 
   try {
     clearCache();
@@ -223,8 +147,6 @@ async function runTests() {
     const windsurfInstaller = platformCodes.platforms.windsurf?.installer;
 
     assert(windsurfInstaller?.target_dir === '.windsurf/skills', 'Windsurf target_dir uses native skills path');
-
-    assert(windsurfInstaller?.skill_format === true, 'Windsurf installer enables native skill output');
 
     assert(
       Array.isArray(windsurfInstaller?.legacy_targets) && windsurfInstaller.legacy_targets.includes('.windsurf/workflows'),
@@ -253,7 +175,7 @@ async function runTests() {
     assert(!(await fs.pathExists(path.join(tempProjectDir, '.windsurf', 'workflows'))), 'Windsurf setup removes legacy workflows dir');
 
     await fs.remove(tempProjectDir);
-    await fs.remove(installedBmadDir);
+    await fs.remove(path.dirname(installedBmadDir));
   } catch (error) {
     assert(false, 'Windsurf native skills migration test succeeds', error.message);
   }
@@ -271,8 +193,6 @@ async function runTests() {
     const kiroInstaller = platformCodes.platforms.kiro?.installer;
 
     assert(kiroInstaller?.target_dir === '.kiro/skills', 'Kiro target_dir uses native skills path');
-
-    assert(kiroInstaller?.skill_format === true, 'Kiro installer enables native skill output');
 
     assert(
       Array.isArray(kiroInstaller?.legacy_targets) && kiroInstaller.legacy_targets.includes('.kiro/steering'),
@@ -301,7 +221,7 @@ async function runTests() {
     assert(!(await fs.pathExists(path.join(tempProjectDir, '.kiro', 'steering'))), 'Kiro setup removes legacy steering dir');
 
     await fs.remove(tempProjectDir);
-    await fs.remove(installedBmadDir);
+    await fs.remove(path.dirname(installedBmadDir));
   } catch (error) {
     assert(false, 'Kiro native skills migration test succeeds', error.message);
   }
@@ -319,8 +239,6 @@ async function runTests() {
     const antigravityInstaller = platformCodes.platforms.antigravity?.installer;
 
     assert(antigravityInstaller?.target_dir === '.agent/skills', 'Antigravity target_dir uses native skills path');
-
-    assert(antigravityInstaller?.skill_format === true, 'Antigravity installer enables native skill output');
 
     assert(
       Array.isArray(antigravityInstaller?.legacy_targets) && antigravityInstaller.legacy_targets.includes('.agent/workflows'),
@@ -349,7 +267,7 @@ async function runTests() {
     assert(!(await fs.pathExists(path.join(tempProjectDir, '.agent', 'workflows'))), 'Antigravity setup removes legacy workflows dir');
 
     await fs.remove(tempProjectDir);
-    await fs.remove(installedBmadDir);
+    await fs.remove(path.dirname(installedBmadDir));
   } catch (error) {
     assert(false, 'Antigravity native skills migration test succeeds', error.message);
   }
@@ -367,8 +285,6 @@ async function runTests() {
     const auggieInstaller = platformCodes.platforms.auggie?.installer;
 
     assert(auggieInstaller?.target_dir === '.augment/skills', 'Auggie target_dir uses native skills path');
-
-    assert(auggieInstaller?.skill_format === true, 'Auggie installer enables native skill output');
 
     assert(
       Array.isArray(auggieInstaller?.legacy_targets) && auggieInstaller.legacy_targets.includes('.augment/commands'),
@@ -402,7 +318,7 @@ async function runTests() {
     assert(!(await fs.pathExists(path.join(tempProjectDir, '.augment', 'commands'))), 'Auggie setup removes legacy commands dir');
 
     await fs.remove(tempProjectDir);
-    await fs.remove(installedBmadDir);
+    await fs.remove(path.dirname(installedBmadDir));
   } catch (error) {
     assert(false, 'Auggie native skills migration test succeeds', error.message);
   }
@@ -420,8 +336,6 @@ async function runTests() {
     const opencodeInstaller = platformCodes.platforms.opencode?.installer;
 
     assert(opencodeInstaller?.target_dir === '.opencode/skills', 'OpenCode target_dir uses native skills path');
-
-    assert(opencodeInstaller?.skill_format === true, 'OpenCode installer enables native skill output');
 
     assert(opencodeInstaller?.ancestor_conflict_check === true, 'OpenCode installer enables ancestor conflict checks');
 
@@ -468,7 +382,7 @@ async function runTests() {
     }
 
     await fs.remove(tempProjectDir);
-    await fs.remove(installedBmadDir);
+    await fs.remove(path.dirname(installedBmadDir));
   } catch (error) {
     assert(false, 'OpenCode native skills migration test succeeds', error.message);
   }
@@ -486,8 +400,6 @@ async function runTests() {
     const claudeInstaller = platformCodes9.platforms['claude-code']?.installer;
 
     assert(claudeInstaller?.target_dir === '.claude/skills', 'Claude Code target_dir uses native skills path');
-
-    assert(claudeInstaller?.skill_format === true, 'Claude Code installer enables native skill output');
 
     assert(claudeInstaller?.ancestor_conflict_check === true, 'Claude Code installer enables ancestor conflict checks');
 
@@ -522,7 +434,7 @@ async function runTests() {
     assert(!(await fs.pathExists(legacyDir9)), 'Claude Code setup removes legacy commands dir');
 
     await fs.remove(tempProjectDir9);
-    await fs.remove(installedBmadDir9);
+    await fs.remove(path.dirname(installedBmadDir9));
   } catch (error) {
     assert(false, 'Claude Code native skills migration test succeeds', error.message);
   }
@@ -561,7 +473,7 @@ async function runTests() {
     );
 
     await fs.remove(tempRoot10);
-    await fs.remove(installedBmadDir10);
+    await fs.remove(path.dirname(installedBmadDir10));
   } catch (error) {
     assert(false, 'Claude Code ancestor conflict protection test succeeds', error.message);
   }
@@ -579,8 +491,6 @@ async function runTests() {
     const codexInstaller = platformCodes11.platforms.codex?.installer;
 
     assert(codexInstaller?.target_dir === '.agents/skills', 'Codex target_dir uses native skills path');
-
-    assert(codexInstaller?.skill_format === true, 'Codex installer enables native skill output');
 
     assert(codexInstaller?.ancestor_conflict_check === true, 'Codex installer enables ancestor conflict checks');
 
@@ -615,7 +525,7 @@ async function runTests() {
     assert(!(await fs.pathExists(legacyDir11)), 'Codex setup removes legacy prompts dir');
 
     await fs.remove(tempProjectDir11);
-    await fs.remove(installedBmadDir11);
+    await fs.remove(path.dirname(installedBmadDir11));
   } catch (error) {
     assert(false, 'Codex native skills migration test succeeds', error.message);
   }
@@ -651,7 +561,7 @@ async function runTests() {
     assert(result12.handlerResult?.conflictDir === expectedConflictDir12, 'Codex ancestor rejection points at ancestor .agents/skills dir');
 
     await fs.remove(tempRoot12);
-    await fs.remove(installedBmadDir12);
+    await fs.remove(path.dirname(installedBmadDir12));
   } catch (error) {
     assert(false, 'Codex ancestor conflict protection test succeeds', error.message);
   }
@@ -669,8 +579,6 @@ async function runTests() {
     const cursorInstaller = platformCodes13.platforms.cursor?.installer;
 
     assert(cursorInstaller?.target_dir === '.cursor/skills', 'Cursor target_dir uses native skills path');
-
-    assert(cursorInstaller?.skill_format === true, 'Cursor installer enables native skill output');
 
     assert(
       Array.isArray(cursorInstaller?.legacy_targets) && cursorInstaller.legacy_targets.includes('.cursor/commands'),
@@ -705,7 +613,7 @@ async function runTests() {
     assert(!(await fs.pathExists(legacyDir13c)), 'Cursor setup removes legacy commands dir');
 
     await fs.remove(tempProjectDir13c);
-    await fs.remove(installedBmadDir13c);
+    await fs.remove(path.dirname(installedBmadDir13c));
   } catch (error) {
     assert(false, 'Cursor native skills migration test succeeds', error.message);
   }
@@ -723,8 +631,6 @@ async function runTests() {
     const rooInstaller = platformCodes13.platforms.roo?.installer;
 
     assert(rooInstaller?.target_dir === '.roo/skills', 'Roo target_dir uses native skills path');
-
-    assert(rooInstaller?.skill_format === true, 'Roo installer enables native skill output');
 
     assert(
       Array.isArray(rooInstaller?.legacy_targets) && rooInstaller.legacy_targets.includes('.roo/commands'),
@@ -770,7 +676,7 @@ async function runTests() {
     assert(await fs.pathExists(skillFile13), 'Roo reinstall preserves SKILL.md output');
 
     await fs.remove(tempProjectDir13);
-    await fs.remove(installedBmadDir13);
+    await fs.remove(path.dirname(installedBmadDir13));
   } catch (error) {
     assert(false, 'Roo native skills migration test succeeds', error.message);
   }
@@ -809,7 +715,7 @@ async function runTests() {
     );
 
     await fs.remove(tempRoot);
-    await fs.remove(installedBmadDir);
+    await fs.remove(path.dirname(installedBmadDir));
   } catch (error) {
     assert(false, 'OpenCode ancestor conflict protection test succeeds', error.message);
   }
@@ -831,8 +737,6 @@ async function runTests() {
     const copilotInstaller = platformCodes17.platforms['github-copilot']?.installer;
 
     assert(copilotInstaller?.target_dir === '.github/skills', 'GitHub Copilot target_dir uses native skills path');
-
-    assert(copilotInstaller?.skill_format === true, 'GitHub Copilot installer enables native skill output');
 
     assert(
       Array.isArray(copilotInstaller?.legacy_targets) && copilotInstaller.legacy_targets.includes('.github/agents'),
@@ -895,7 +799,7 @@ async function runTests() {
     );
 
     await fs.remove(tempProjectDir17);
-    await fs.remove(installedBmadDir17);
+    await fs.remove(path.dirname(installedBmadDir17));
   } catch (error) {
     assert(false, 'GitHub Copilot native skills migration test succeeds', error.message);
   }
@@ -913,8 +817,6 @@ async function runTests() {
     const clineInstaller = platformCodes18.platforms.cline?.installer;
 
     assert(clineInstaller?.target_dir === '.cline/skills', 'Cline target_dir uses native skills path');
-
-    assert(clineInstaller?.skill_format === true, 'Cline installer enables native skill output');
 
     assert(
       Array.isArray(clineInstaller?.legacy_targets) && clineInstaller.legacy_targets.includes('.clinerules/workflows'),
@@ -957,7 +859,7 @@ async function runTests() {
     assert(await fs.pathExists(skillFile18), 'Cline reinstall preserves SKILL.md output');
 
     await fs.remove(tempProjectDir18);
-    await fs.remove(installedBmadDir18);
+    await fs.remove(path.dirname(installedBmadDir18));
   } catch (error) {
     assert(false, 'Cline native skills migration test succeeds', error.message);
   }
@@ -975,8 +877,6 @@ async function runTests() {
     const codebuddyInstaller = platformCodes19.platforms.codebuddy?.installer;
 
     assert(codebuddyInstaller?.target_dir === '.codebuddy/skills', 'CodeBuddy target_dir uses native skills path');
-
-    assert(codebuddyInstaller?.skill_format === true, 'CodeBuddy installer enables native skill output');
 
     assert(
       Array.isArray(codebuddyInstaller?.legacy_targets) && codebuddyInstaller.legacy_targets.includes('.codebuddy/commands'),
@@ -1017,7 +917,7 @@ async function runTests() {
     assert(await fs.pathExists(skillFile19), 'CodeBuddy reinstall preserves SKILL.md output');
 
     await fs.remove(tempProjectDir19);
-    await fs.remove(installedBmadDir19);
+    await fs.remove(path.dirname(installedBmadDir19));
   } catch (error) {
     assert(false, 'CodeBuddy native skills migration test succeeds', error.message);
   }
@@ -1035,8 +935,6 @@ async function runTests() {
     const crushInstaller = platformCodes20.platforms.crush?.installer;
 
     assert(crushInstaller?.target_dir === '.crush/skills', 'Crush target_dir uses native skills path');
-
-    assert(crushInstaller?.skill_format === true, 'Crush installer enables native skill output');
 
     assert(
       Array.isArray(crushInstaller?.legacy_targets) && crushInstaller.legacy_targets.includes('.crush/commands'),
@@ -1077,7 +975,7 @@ async function runTests() {
     assert(await fs.pathExists(skillFile20), 'Crush reinstall preserves SKILL.md output');
 
     await fs.remove(tempProjectDir20);
-    await fs.remove(installedBmadDir20);
+    await fs.remove(path.dirname(installedBmadDir20));
   } catch (error) {
     assert(false, 'Crush native skills migration test succeeds', error.message);
   }
@@ -1095,8 +993,6 @@ async function runTests() {
     const traeInstaller = platformCodes21.platforms.trae?.installer;
 
     assert(traeInstaller?.target_dir === '.trae/skills', 'Trae target_dir uses native skills path');
-
-    assert(traeInstaller?.skill_format === true, 'Trae installer enables native skill output');
 
     assert(
       Array.isArray(traeInstaller?.legacy_targets) && traeInstaller.legacy_targets.includes('.trae/rules'),
@@ -1136,7 +1032,7 @@ async function runTests() {
     assert(await fs.pathExists(skillFile21), 'Trae reinstall preserves SKILL.md output');
 
     await fs.remove(tempProjectDir21);
-    await fs.remove(installedBmadDir21);
+    await fs.remove(path.dirname(installedBmadDir21));
   } catch (error) {
     assert(false, 'Trae native skills migration test succeeds', error.message);
   }
@@ -1194,7 +1090,7 @@ async function runTests() {
     );
 
     await fs.remove(tempProjectDir22);
-    await fs.remove(installedBmadDir22);
+    await fs.remove(path.dirname(installedBmadDir22));
   } catch (error) {
     assert(false, 'KiloCoder suspended test succeeds', error.message);
   }
@@ -1212,8 +1108,6 @@ async function runTests() {
     const geminiInstaller = platformCodes23.platforms.gemini?.installer;
 
     assert(geminiInstaller?.target_dir === '.gemini/skills', 'Gemini target_dir uses native skills path');
-
-    assert(geminiInstaller?.skill_format === true, 'Gemini installer enables native skill output');
 
     assert(
       Array.isArray(geminiInstaller?.legacy_targets) && geminiInstaller.legacy_targets.includes('.gemini/commands'),
@@ -1253,7 +1147,7 @@ async function runTests() {
     assert(await fs.pathExists(skillFile23), 'Gemini reinstall preserves SKILL.md output');
 
     await fs.remove(tempProjectDir23);
-    await fs.remove(installedBmadDir23);
+    await fs.remove(path.dirname(installedBmadDir23));
   } catch (error) {
     assert(false, 'Gemini native skills migration test succeeds', error.message);
   }
@@ -1271,7 +1165,6 @@ async function runTests() {
     const iflowInstaller = platformCodes24.platforms.iflow?.installer;
 
     assert(iflowInstaller?.target_dir === '.iflow/skills', 'iFlow target_dir uses native skills path');
-    assert(iflowInstaller?.skill_format === true, 'iFlow installer enables native skill output');
     assert(
       Array.isArray(iflowInstaller?.legacy_targets) && iflowInstaller.legacy_targets.includes('.iflow/commands'),
       'iFlow installer cleans legacy commands output',
@@ -1303,7 +1196,7 @@ async function runTests() {
     assert(!(await fs.pathExists(path.join(tempProjectDir24, '.iflow', 'commands'))), 'iFlow setup removes legacy commands dir');
 
     await fs.remove(tempProjectDir24);
-    await fs.remove(installedBmadDir24);
+    await fs.remove(path.dirname(installedBmadDir24));
   } catch (error) {
     assert(false, 'iFlow native skills migration test succeeds', error.message);
   }
@@ -1321,7 +1214,6 @@ async function runTests() {
     const qwenInstaller = platformCodes25.platforms.qwen?.installer;
 
     assert(qwenInstaller?.target_dir === '.qwen/skills', 'QwenCoder target_dir uses native skills path');
-    assert(qwenInstaller?.skill_format === true, 'QwenCoder installer enables native skill output');
     assert(
       Array.isArray(qwenInstaller?.legacy_targets) && qwenInstaller.legacy_targets.includes('.qwen/commands'),
       'QwenCoder installer cleans legacy commands output',
@@ -1353,7 +1245,7 @@ async function runTests() {
     assert(!(await fs.pathExists(path.join(tempProjectDir25, '.qwen', 'commands'))), 'QwenCoder setup removes legacy commands dir');
 
     await fs.remove(tempProjectDir25);
-    await fs.remove(installedBmadDir25);
+    await fs.remove(path.dirname(installedBmadDir25));
   } catch (error) {
     assert(false, 'QwenCoder native skills migration test succeeds', error.message);
   }
@@ -1371,7 +1263,6 @@ async function runTests() {
     const rovoInstaller = platformCodes26.platforms['rovo-dev']?.installer;
 
     assert(rovoInstaller?.target_dir === '.rovodev/skills', 'Rovo Dev target_dir uses native skills path');
-    assert(rovoInstaller?.skill_format === true, 'Rovo Dev installer enables native skill output');
     assert(
       Array.isArray(rovoInstaller?.legacy_targets) && rovoInstaller.legacy_targets.includes('.rovodev/workflows'),
       'Rovo Dev installer cleans legacy workflows output',
@@ -1422,7 +1313,7 @@ async function runTests() {
     assert(cleanedPrompts26.prompts[0].name === 'my-custom-prompt', 'Rovo Dev cleanup preserves non-BMAD entries in prompts.yml');
 
     await fs.remove(tempProjectDir26);
-    await fs.remove(installedBmadDir26);
+    await fs.remove(path.dirname(installedBmadDir26));
   } catch (error) {
     assert(false, 'Rovo Dev native skills migration test succeeds', error.message);
   }
@@ -1487,7 +1378,7 @@ async function runTests() {
     assert(!(await fs.pathExists(regularSkillDir27)), 'Cleanup removes stale non-bmad-os skills');
 
     await fs.remove(tempProjectDir27);
-    await fs.remove(installedBmadDir27);
+    await fs.remove(path.dirname(installedBmadDir27));
   } catch (error) {
     assert(false, 'bmad-os-* skill preservation test succeeds', error.message);
   }
@@ -1507,8 +1398,6 @@ async function runTests() {
     const piInstaller = platformCodes28.platforms.pi?.installer;
 
     assert(piInstaller?.target_dir === '.pi/skills', 'Pi target_dir uses native skills path');
-    assert(piInstaller?.skill_format === true, 'Pi installer enables native skill output');
-    assert(piInstaller?.template_type === 'default', 'Pi installer uses default skill template');
 
     tempProjectDir28 = await fs.mkdtemp(path.join(os.tmpdir(), 'bmad-pi-test-'));
     installedBmadDir28 = await createTestBmadFixture();
@@ -1579,7 +1468,7 @@ async function runTests() {
     assert(false, 'Pi native skills test succeeds', error.message);
   } finally {
     if (tempProjectDir28) await fs.remove(tempProjectDir28).catch(() => {});
-    if (installedBmadDir28) await fs.remove(installedBmadDir28).catch(() => {});
+    if (installedBmadDir28) await fs.remove(path.dirname(installedBmadDir28)).catch(() => {});
   }
 
   console.log('');
@@ -1599,7 +1488,6 @@ async function runTests() {
     // --- Skill at unusual path: core/custom-area/my-skill/ ---
     const skillDir29 = path.join(tempFixture29, 'core', 'custom-area', 'my-skill');
     await fs.ensureDir(skillDir29);
-    await fs.writeFile(path.join(skillDir29, 'bmad-skill-manifest.yaml'), 'type: skill\n');
     await fs.writeFile(
       path.join(skillDir29, 'SKILL.md'),
       '---\nname: my-skill\ndescription: A skill at an unusual path\n---\n\nFollow the instructions in [workflow.md](workflow.md).\n',
@@ -1615,10 +1503,9 @@ async function runTests() {
       '---\nname: Regular Workflow\ndescription: A regular workflow not a skill\n---\n\nWorkflow body\n',
     );
 
-    // --- Skill inside workflows/ dir: core/workflows/wf-skill/ (exercises findWorkflows skip logic) ---
+    // --- Skill inside workflows/ dir: core/workflows/wf-skill/ ---
     const wfSkillDir29 = path.join(tempFixture29, 'core', 'workflows', 'wf-skill');
     await fs.ensureDir(wfSkillDir29);
-    await fs.writeFile(path.join(wfSkillDir29, 'bmad-skill-manifest.yaml'), 'type: skill\n');
     await fs.writeFile(
       path.join(wfSkillDir29, 'SKILL.md'),
       '---\nname: wf-skill\ndescription: A skill inside workflows dir\n---\n\nFollow the instructions in [workflow.md](workflow.md).\n',
@@ -1628,12 +1515,20 @@ async function runTests() {
     // --- Skill inside tasks/ dir: core/tasks/task-skill/ ---
     const taskSkillDir29 = path.join(tempFixture29, 'core', 'tasks', 'task-skill');
     await fs.ensureDir(taskSkillDir29);
-    await fs.writeFile(path.join(taskSkillDir29, 'bmad-skill-manifest.yaml'), 'type: skill\n');
     await fs.writeFile(
       path.join(taskSkillDir29, 'SKILL.md'),
       '---\nname: task-skill\ndescription: A skill inside tasks dir\n---\n\nFollow the instructions in [workflow.md](workflow.md).\n',
     );
     await fs.writeFile(path.join(taskSkillDir29, 'workflow.md'), '# Task Skill\n\nSkill in tasks\n');
+
+    // --- Native agent entrypoint inside agents/: core/agents/bmad-tea/ ---
+    const nativeAgentDir29 = path.join(tempFixture29, 'core', 'agents', 'bmad-tea');
+    await fs.ensureDir(nativeAgentDir29);
+    await fs.writeFile(path.join(nativeAgentDir29, 'bmad-skill-manifest.yaml'), 'type: agent\ncanonicalId: bmad-tea\n');
+    await fs.writeFile(
+      path.join(nativeAgentDir29, 'SKILL.md'),
+      '---\nname: bmad-tea\ndescription: Native agent entrypoint\n---\n\nPresent a capability menu.\n',
+    );
 
     // Minimal agent so core module is detected
     await fs.ensureDir(path.join(tempFixture29, 'core', 'agents'));
@@ -1652,35 +1547,32 @@ async function runTests() {
       'Skill path includes relative path from module root',
     );
 
-    // Skill should NOT be in workflows
-    const inWorkflows29 = generator29.workflows.find((w) => w.name === 'my-skill');
-    assert(inWorkflows29 === undefined, 'Skill at unusual path does NOT appear in workflows[]');
-
     // Skill in tasks/ dir should be in skills
     const taskSkillEntry29 = generator29.skills.find((s) => s.canonicalId === 'task-skill');
     assert(taskSkillEntry29 !== undefined, 'Skill in tasks/ dir appears in skills[]');
 
-    // Skill in tasks/ should NOT appear in tasks[]
-    const inTasks29 = generator29.tasks.find((t) => t.name === 'task-skill');
-    assert(inTasks29 === undefined, 'Skill in tasks/ dir does NOT appear in tasks[]');
+    // Native agent entrypoint should be installed as a verbatim skill and also
+    // remain visible to the agent manifest pipeline.
+    const nativeAgentEntry29 = generator29.skills.find((s) => s.canonicalId === 'bmad-tea');
+    assert(nativeAgentEntry29 !== undefined, 'Native type:agent SKILL.md dir appears in skills[]');
+    assert(
+      nativeAgentEntry29 && nativeAgentEntry29.path.includes('agents/bmad-tea/SKILL.md'),
+      'Native type:agent SKILL.md path points to the agent directory entrypoint',
+    );
+    const nativeAgentManifest29 = generator29.agents.find((a) => a.name === 'bmad-tea');
+    assert(nativeAgentManifest29 !== undefined, 'Native type:agent SKILL.md dir appears in agents[] for agent metadata');
 
-    // Regular workflow should be in workflows, NOT in skills
-    const regularWf29 = generator29.workflows.find((w) => w.name === 'Regular Workflow');
-    assert(regularWf29 !== undefined, 'Regular type:workflow appears in workflows[]');
-
+    // Regular type:workflow should NOT appear in skills[]
     const regularInSkills29 = generator29.skills.find((s) => s.canonicalId === 'regular-wf');
     assert(regularInSkills29 === undefined, 'Regular type:workflow does NOT appear in skills[]');
 
-    // Skill inside workflows/ should be in skills[], NOT in workflows[] (exercises findWorkflows skip at lines 311/322)
+    // Skill inside workflows/ should be in skills[]
     const wfSkill29 = generator29.skills.find((s) => s.canonicalId === 'wf-skill');
     assert(wfSkill29 !== undefined, 'Skill in workflows/ dir appears in skills[]');
-    const wfSkillInWorkflows29 = generator29.workflows.find((w) => w.name === 'wf-skill');
-    assert(wfSkillInWorkflows29 === undefined, 'Skill in workflows/ dir does NOT appear in workflows[]');
 
     // Test scanInstalledModules recognizes skill-only modules
     const skillOnlyModDir29 = path.join(tempFixture29, 'skill-only-mod');
     await fs.ensureDir(path.join(skillOnlyModDir29, 'deep', 'nested', 'my-skill'));
-    await fs.writeFile(path.join(skillOnlyModDir29, 'deep', 'nested', 'my-skill', 'bmad-skill-manifest.yaml'), 'type: skill\n');
     await fs.writeFile(
       path.join(skillOnlyModDir29, 'deep', 'nested', 'my-skill', 'SKILL.md'),
       '---\nname: my-skill\ndescription: desc\n---\n\nFollow the instructions in [workflow.md](workflow.md).\n',
@@ -1689,6 +1581,37 @@ async function runTests() {
 
     const scannedModules29 = await generator29.scanInstalledModules(tempFixture29);
     assert(scannedModules29.includes('skill-only-mod'), 'scanInstalledModules recognizes skill-only module');
+
+    // Test scanInstalledModules recognizes native-agent-only modules too
+    const agentOnlyModDir29 = path.join(tempFixture29, 'agent-only-mod');
+    await fs.ensureDir(path.join(agentOnlyModDir29, 'deep', 'nested', 'bmad-tea'));
+    await fs.writeFile(path.join(agentOnlyModDir29, 'deep', 'nested', 'bmad-tea', 'bmad-skill-manifest.yaml'), 'type: agent\n');
+    await fs.writeFile(
+      path.join(agentOnlyModDir29, 'deep', 'nested', 'bmad-tea', 'SKILL.md'),
+      '---\nname: bmad-tea\ndescription: desc\n---\n\nAgent menu.\n',
+    );
+
+    const rescannedModules29 = await generator29.scanInstalledModules(tempFixture29);
+    assert(rescannedModules29.includes('agent-only-mod'), 'scanInstalledModules recognizes native-agent-only module');
+
+    // Test scanInstalledModules recognizes multi-entry manifests keyed under SKILL.md
+    const multiEntryModDir29 = path.join(tempFixture29, 'multi-entry-mod');
+    await fs.ensureDir(path.join(multiEntryModDir29, 'deep', 'nested', 'bmad-tea'));
+    await fs.writeFile(
+      path.join(multiEntryModDir29, 'deep', 'nested', 'bmad-tea', 'bmad-skill-manifest.yaml'),
+      'SKILL.md:\n  type: agent\n  canonicalId: bmad-tea\n',
+    );
+    await fs.writeFile(
+      path.join(multiEntryModDir29, 'deep', 'nested', 'bmad-tea', 'SKILL.md'),
+      '---\nname: bmad-tea\ndescription: desc\n---\n\nAgent menu.\n',
+    );
+
+    const rescannedModules29b = await generator29.scanInstalledModules(tempFixture29);
+    assert(rescannedModules29b.includes('multi-entry-mod'), 'scanInstalledModules recognizes multi-entry native-agent module');
+
+    // skill-manifest.csv should include the native agent entrypoint
+    const skillManifestCsv29 = await fs.readFile(path.join(tempFixture29, '_config', 'skill-manifest.csv'), 'utf8');
+    assert(skillManifestCsv29.includes('bmad-tea'), 'skill-manifest.csv includes native type:agent SKILL.md entrypoint');
   } catch (error) {
     assert(false, 'Unified skill scanner test succeeds', error.message);
   } finally {
@@ -1786,18 +1709,12 @@ async function runTests() {
     });
 
     assert(result.success === true, 'Antigravity setup succeeds with overlapping skill names');
-    assert(result.detail === '2 agents', 'Installer detail reports agents separately from skills');
-    assert(result.handlerResult.results.skillDirectories === 2, 'Result exposes unique skill directory count');
-    assert(result.handlerResult.results.agents === 2, 'Result retains generated agent write count');
-    assert(result.handlerResult.results.workflows === 1, 'Result retains generated workflow count');
+    assert(result.detail === '1 skills', 'Installer detail reports skill count');
+    assert(result.handlerResult.results.skillDirectories === 1, 'Result exposes unique skill directory count');
     assert(result.handlerResult.results.skills === 1, 'Result retains verbatim skill count');
     assert(
-      await fs.pathExists(path.join(collisionProjectDir, '.agent', 'skills', 'bmad-agent-bmad-master', 'SKILL.md')),
-      'Agent skill directory is created',
-    );
-    assert(
       await fs.pathExists(path.join(collisionProjectDir, '.agent', 'skills', 'bmad-help', 'SKILL.md')),
-      'Overlapping skill directory is created once',
+      'Skill directory is created from skill-manifest',
     );
   } catch (error) {
     assert(false, 'Skill-format unique count test succeeds', error.message);
@@ -1821,8 +1738,6 @@ async function runTests() {
     const onaInstaller = platformCodes32.platforms.ona?.installer;
 
     assert(onaInstaller?.target_dir === '.ona/skills', 'Ona target_dir uses native skills path');
-    assert(onaInstaller?.skill_format === true, 'Ona installer enables native skill output');
-    assert(onaInstaller?.template_type === 'default', 'Ona installer uses default skill template');
 
     tempProjectDir32 = await fs.mkdtemp(path.join(os.tmpdir(), 'bmad-ona-test-'));
     installedBmadDir32 = await createTestBmadFixture();
@@ -1854,6 +1769,9 @@ async function runTests() {
 
     const skillFile32 = path.join(tempProjectDir32, '.ona', 'skills', 'bmad-master', 'SKILL.md');
     assert(await fs.pathExists(skillFile32), 'Ona install writes SKILL.md directory output');
+
+    const workflowFile32 = path.join(tempProjectDir32, '.ona', 'skills', 'bmad-master', 'workflow.md');
+    assert(await fs.pathExists(workflowFile32), 'Ona install copies non-SKILL.md files (workflow.md) verbatim');
 
     // Parse YAML frontmatter between --- markers
     const skillContent32 = await fs.readFile(skillFile32, 'utf8');
@@ -1893,7 +1811,7 @@ async function runTests() {
     assert(false, 'Ona native skills test succeeds', error.message);
   } finally {
     if (tempProjectDir32) await fs.remove(tempProjectDir32).catch(() => {});
-    if (installedBmadDir32) await fs.remove(installedBmadDir32).catch(() => {});
+    if (installedBmadDir32) await fs.remove(path.dirname(installedBmadDir32)).catch(() => {});
   }
 
   console.log('');
