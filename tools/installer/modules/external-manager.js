@@ -1,4 +1,4 @@
-const fs = require('fs-extra');
+const fs = require('../fs-native');
 const os = require('node:os');
 const path = require('node:path');
 const { execSync } = require('node:child_process');
@@ -6,7 +6,9 @@ const yaml = require('yaml');
 const prompts = require('../prompts');
 const { RegistryClient } = require('./registry-client');
 
-const REGISTRY_RAW_URL = 'https://raw.githubusercontent.com/bmad-code-org/bmad-plugins-marketplace/main/registry/official.yaml';
+const MARKETPLACE_OWNER = 'bmad-code-org';
+const MARKETPLACE_REPO = 'bmad-plugins-marketplace';
+const MARKETPLACE_REF = 'main';
 const FALLBACK_CONFIG_PATH = path.join(__dirname, 'registry-fallback.yaml');
 
 /**
@@ -33,8 +35,7 @@ class ExternalModuleManager {
 
     // Try remote registry first
     try {
-      const content = await this._client.fetch(REGISTRY_RAW_URL);
-      const config = yaml.parse(content);
+      const config = await this._client.fetchGitHubYaml(MARKETPLACE_OWNER, MARKETPLACE_REPO, 'registry/official.yaml', MARKETPLACE_REF);
       if (config?.modules?.length) {
         this.cachedModules = config;
         return config;
@@ -107,46 +108,6 @@ class ExternalModuleManager {
   async getModuleByCode(code) {
     const modules = await this.listAvailable();
     return modules.find((m) => m.code === code) || null;
-  }
-
-  /**
-   * Get module info by key
-   * @param {string} key - The module key (e.g., 'bmad-creative-intelligence-suite')
-   * @returns {Object|null} Module info or null if not found
-   */
-  async getModuleByKey(key) {
-    const modules = await this.listAvailable();
-    return modules.find((m) => m.key === key) || null;
-  }
-
-  /**
-   * Check if a module code exists in external modules
-   * @param {string} code - The module code to check
-   * @returns {boolean} True if the module exists
-   */
-  async hasModule(code) {
-    const module = await this.getModuleByCode(code);
-    return module !== null;
-  }
-
-  /**
-   * Get the URL for a module by code
-   * @param {string} code - The module code
-   * @returns {string|null} The URL or null if not found
-   */
-  async getModuleUrl(code) {
-    const module = await this.getModuleByCode(code);
-    return module ? module.url : null;
-  }
-
-  /**
-   * Get the module definition path for a module by code
-   * @param {string} code - The module code
-   * @returns {string|null} The module definition path or null if not found
-   */
-  async getModuleDefinition(code) {
-    const module = await this.getModuleByCode(code);
-    return module ? module.moduleDefinition : null;
   }
 
   /**

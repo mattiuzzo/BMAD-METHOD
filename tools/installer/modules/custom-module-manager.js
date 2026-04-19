@@ -1,4 +1,4 @@
-const fs = require('fs-extra');
+const fs = require('../fs-native');
 const os = require('node:os');
 const path = require('node:path');
 const { execSync } = require('node:child_process');
@@ -153,33 +153,6 @@ class CustomModuleManager {
       isValid: true,
       error: null,
     };
-  }
-
-  /**
-   * @deprecated Use parseSource() instead. Kept for backward compatibility.
-   * Parse and validate a GitHub repository URL.
-   * @param {string} url - GitHub URL to validate
-   * @returns {Object} { owner, repo, isValid, error }
-   */
-  validateGitHubUrl(url) {
-    if (!url || typeof url !== 'string') {
-      return { owner: null, repo: null, isValid: false, error: 'URL is required' };
-    }
-    const trimmed = url.trim();
-
-    // HTTPS format: https://github.com/owner/repo[.git] (strict, no trailing path)
-    const httpsMatch = trimmed.match(/^https?:\/\/github\.com\/([^/]+)\/([^/.]+?)(?:\.git)?$/);
-    if (httpsMatch) {
-      return { owner: httpsMatch[1], repo: httpsMatch[2], isValid: true, error: null };
-    }
-
-    // SSH format: git@github.com:owner/repo[.git]
-    const sshMatch = trimmed.match(/^git@github\.com:([^/]+)\/([^/.]+?)(?:\.git)?$/);
-    if (sshMatch) {
-      return { owner: sshMatch[1], repo: sshMatch[2], isValid: true, error: null };
-    }
-
-    return { owner: null, repo: null, isValid: false, error: 'Not a valid GitHub URL (expected https://github.com/owner/repo)' };
   }
 
   // ─── Marketplace JSON ─────────────────────────────────────────────────────
