@@ -1,0 +1,12 @@
+{
+  "folders": [
+    { "name": "Ponte Jurídica (MBA)", "path": "../../../impacta/bootcamp/Ponte Juridica" },
+    { "name": "BMAD-METHOD", "path": ".." }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/.git": true
+    }
+  }
+}
