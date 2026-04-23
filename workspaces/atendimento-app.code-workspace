@@ -1,0 +1,12 @@
+{
+  "folders": [
+    { "name": "Tik Time (atendimento-app)", "path": "../../atendimento-app" },
+    { "name": "BMAD-METHOD", "path": ".." }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/.git": true
+    }
+  }
+}
