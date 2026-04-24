@@ -1,12 +1,14 @@
 {
   "folders": [
     { "name": "Corttex-AppLabels", "path": "../../../Totvs/Corttex-AppLabels" },
-    { "name": "BMAD-METHOD", "path": ".." }
+    { "name": "BMAD-METHOD", "path": ".." },
   ],
   "settings": {
     "files.exclude": {
       "**/node_modules": true,
-      "**/.git": true
-    }
-  }
+      "**/.git": true,
+    },
+    "totvsLanguageServer.welcomePage": false,
+    "totvsLanguageServer.editor.linter.includes": "R:\\Totvs\\Includes",
+  },
 }

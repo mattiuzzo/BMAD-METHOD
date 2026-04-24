@@ -92,5 +92,9 @@
   "[xml]": {
     "editor.defaultFormatter": "redhat.vscode-xml"
   },
-  "xml.format.maxLineWidth": 140
+  "xml.format.maxLineWidth": 140,
+  "angular.enable-strict-mode-prompt": false,
+  "totvsLanguageServer.welcomePage": false,
+  "totvsLanguageServer.editor.linter.includes": "R:\\Totvs\\Includes\\Totvs",
+  "js/ts.tsserver.maxMemory": 4096
 }
