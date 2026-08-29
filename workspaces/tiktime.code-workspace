@@ -1,0 +1,14 @@
+{
+  "folders": [
+    { "name": "tiktime", "path": "../../tiktime" },
+    { "name": "BMAD-METHOD", "path": ".." },
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/.git": true,
+    },
+    "totvsLanguageServer.welcomePage": false,
+    "totvsLanguageServer.editor.linter.includes": "R:\\Totvs\\Includes\\Totvs",
+  },
+}

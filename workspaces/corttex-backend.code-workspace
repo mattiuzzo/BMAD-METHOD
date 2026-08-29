@@ -1,0 +1,12 @@
+{
+  "folders": [
+    { "name": "Corttex-Backend", "path": "../../../Totvs/Corttex-Backend" },
+    { "name": "BMAD-METHOD", "path": ".." }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/.git": true
+    }
+  }
+}

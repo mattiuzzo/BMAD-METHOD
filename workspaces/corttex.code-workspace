@@ -1,0 +1,19 @@
+{
+  "folders": [
+    { "name": "corttex-protheus", "path": "../../../Totvs/Corttex" },
+    { "name": "corttex-ecommerce", "path": "../../../Totvs/corttex-ecommerce" },
+    { "name": "corttex-frontend", "path": "../../../Totvs/corttex-frontend" },
+    { "name": "corttex-Backend", "path": "../../../Totvs/Corttex-Backend" },
+    { "name": "corttex-mobile-log", "path": "../../../Totvs/corttex-mobile-log" },
+    { "name": "corttex-web-labels", "path": "../../../Totvs/corttex-web-labels" },
+    { "name": "BMAD-METHOD", "path": ".." },
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/.git": true,
+    },
+    "totvsLanguageServer.welcomePage": false,
+    "totvsLanguageServer.workspaceServerConfig": true,
+  },
+}

@@ -1,0 +1,14 @@
+{
+  "folders": [
+    { "name": "corttex-web-labels", "path": "../../../Totvs/corttex-web-labels" },
+    { "name": "BMAD-METHOD", "path": ".." },
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/.git": true,
+    },
+    "totvsLanguageServer.welcomePage": false,
+    "totvsLanguageServer.editor.linter.includes": "R:\\Totvs\\Includes",
+  },
+}

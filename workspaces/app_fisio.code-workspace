@@ -1,0 +1,13 @@
+{
+  "folders": [
+    { "name": "Você e Seu Fisio / FisioPro", "path": "../../app_fisio" },
+    { "name": "BMAD-METHOD", "path": ".." },
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/.git": true,
+    },
+    "totvsLanguageServer.welcomePage": false,
+  },
+}

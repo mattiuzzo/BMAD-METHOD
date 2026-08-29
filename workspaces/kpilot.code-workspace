@@ -1,0 +1,13 @@
+{
+  "folders": [
+    { "name": "Kpilot", "path": "../../kpilot" },
+    { "name": "BMAD-METHOD", "path": ".." }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/.git": true
+    },
+    "totvsLanguageServer.welcomePage": false
+  }
+}
