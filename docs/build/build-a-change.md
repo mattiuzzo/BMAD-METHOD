@@ -108,16 +108,16 @@ review bot — see [Review a Change](review-a-change.md).
 
 ### 6. Review the Result
 
-When it finishes, `bmad-build` shows you the completed change and its review
-notes. This is the main checkpoint. For a guided walkthrough of the finished
-work, see [Walk Through a Change](walk-through-a-change.md).
+When it finishes, `bmad-build` gives you a short summary and offers the usual
+next steps: create a PR, walk through the change, or make another change. For
+a guided review of the finished work, see
+[Walk Through a Change](walk-through-a-change.md).
 
-- Skim the diff to confirm the change matches your intent
+- Run the walkthrough or skim the diff to confirm the change matches your intent
 - If something looks off, tell the agent what to fix — it can iterate in the
   same session
 
-Once you are satisfied, push the commit. It can offer to push and create a PR
-for you.
+Once you are satisfied, ask it to push the commit and create a PR for you.
 
 :::caution[If Something Breaks]
 If a pushed change causes unexpected issues, use `git revert HEAD` to undo the
@@ -167,7 +167,26 @@ not own the backlog, pick the next story, or replace those later checks.
 Use `bmad-build` for foundational, risky, or important stories where your
 decisions may set patterns for later work. Once those patterns are stable,
 `bmad-build-auto` can run one unit without waiting for you; see
-[Autonomous Development Loops](../reference/build-auto.md).
+[Autonomous Development Loops](./autonomous-development-loops.md).
+
+## Implementation Skills
+
+| Skill                 | Purpose                                                                                                                                                       | Produces                                         |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `bmad-build`          | Implement and review one direct intent or planned story with human checkpoints (this page)                                                                    | Implementation record + code                     |
+| `bmad-build-auto`     | Implement and review one unit unattended for a caller or orchestrator ([Autonomous Development Loops](./autonomous-development-loops.md))                     | Implementation record + code + terminal status   |
+| `bmad-code-review`    | Review any code change with several independent reviewers ([Review a Change](./review-a-change.md))                                                           | Findings + applied patches                       |
+| `bmad-correct-course` | Assess the impact of a significant mid-sprint change ([Break Work into Stories and Track It](../plan/break-work-into-stories-and-track-it.md#correct-course)) | Updated plan or re-routing                       |
+| `bmad-retrospective`  | Review a completed epic against the evidence it left behind ([Finish an Epic](./finish-an-epic.md))                                                           | Retro document, action items, acceptance verdict |
+
+Clear one-session work enters `bmad-build` directly. A spec-backed epic uses
+Story Breakdown to create several units under one `SPEC.md`; a project adds a
+PRD, UX, architecture, epics, readiness results, and sprint tracking before
+selecting each unit. `bmad-build-auto` does not orchestrate those units: an AI
+coding session or another orchestrator, such as bmad-loop, dispatches one
+worker per unit. See
+[Autonomous Development Loops](./autonomous-development-loops.md) for the
+worker and orchestration contracts.
 
 ## Why Does This Take So Long? I Could Plan Mode and Code It in Ten Minutes
 

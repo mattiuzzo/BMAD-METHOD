@@ -26,7 +26,7 @@ is fresh and the session logs have not been cleared.
 - **Aggregate defects**: the architecture that drifted, the helper written
   twice, the file that grew a little in every session.
 - **Diff-scope review**: it hands the epic's diff to
-  [`bmad-review`](./review-a-change.md), weighting the seams between
+  [`bmad-review`](../reference/skills-and-agents.md#bmad-review), weighting the seams between
   stories where no single session saw both sides.
 - **Spec reconciliation**: where the built code diverged from what the epic
   and PRD described.
@@ -101,5 +101,5 @@ written report and verdict.
 | A standard review        | `/bmad-retrospective`                                                                                                        |
 | A specific epic          | `/bmad-retrospective 3`                                                                                                      |
 | A spec-backed epic       | `/bmad-retrospective _bmad-output/specs/spec-<slug>/`                                                                        |
-| The team to talk it over | Ask to "discuss it as a team"; it convenes [party mode](../explanation/party-mode.md) over the real findings, off by default |
+| The team to talk it over | Ask to "discuss it as a team"; it convenes [party mode](../customize/run-multi-agent-discussions.md) over the real findings, off by default |
 | An unattended run        | `-H <epic>`: verdict on the evidence alone                                                                                   |

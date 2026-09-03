@@ -25,7 +25,7 @@ Open your project in your AI coding tool, invoke `bmad-build` with what you want
 
 **[Build your first project with BMad →](https://docs.bmad-method.org/start/build-your-first-change/)**
 
-**[Add BMad to an existing codebase →](https://docs.bmad-method.org/how-to/established-projects/)**
+**[Add BMad to an existing codebase →](https://docs.bmad-method.org/existing-codebases/start-in-an-existing-codebase/)**
 
 BMad is free and open source, with no paywalled workflows or gated community. For installation prerequisites, updates, prerelease builds, and the installer's live automation help, see the [installation guide](https://docs.bmad-method.org/start/install-bmad/).
 
@@ -40,7 +40,7 @@ Coding assistants are effective at implementation, but they often turn unstated 
 - **Guided collaboration** — Use structured workflows and multiple-agent discussions without handing over judgment.
 - **One delivery path** — Move from early thinking through reviewed implementation, correction, and learning.
 
-[See how the workflows fit together →](https://docs.bmad-method.org/reference/workflow-map/)
+[See how much planning a change needs →](https://docs.bmad-method.org/plan/choose-a-planning-path/)
 
 ## BMad Ecosystem
 
@@ -62,9 +62,8 @@ Install the core method or add official modules for specialized work.
 ## Documentation
 
 - **[Build Your First Change](https://docs.bmad-method.org/start/build-your-first-change/)** — Install BMad and build a small project.
-- **[Workflow Map](https://docs.bmad-method.org/reference/workflow-map/)** — Understand the available paths and outputs.
-- **[Established Projects](https://docs.bmad-method.org/how-to/established-projects/)** — Add BMad to an existing codebase.
-- **[Upgrade to V6](https://docs.bmad-method.org/how-to/upgrade-to-v6/)** — Migrate from an earlier version.
+- **[Choose a Planning Path](https://docs.bmad-method.org/plan/choose-a-planning-path/)** — Pick how much planning a change needs and see what each planning skill produces.
+- **[Start in an Existing Codebase](https://docs.bmad-method.org/existing-codebases/start-in-an-existing-codebase/)** — Add BMad to an existing codebase.
 
 ## Community
 
