@@ -36,13 +36,12 @@ say what the product is. Brainstorming, Forge Idea, Deep Recon, a product
 brief, and a PRFAQ exist to get the PRD written well. Everything after the PRD
 is derived from it:
 
-- `bmad-ux` writes `DESIGN.md` and `EXPERIENCE.md` alongside the PRD.
+- `bmad-ux` writes `DESIGN.md` and `EXPERIENCE.md` in its own `ux-<slug>/` folder, as input beside the PRD.
 - `bmad-architecture` writes a short architecture document (the spine): the
   decisions that keep independently built epics compatible.
 - `bmad-spec` writes one spec per epic from the PRD, pointing at the spine and
   the UX documents rather than copying them.
-- `bmad-create-epics-and-stories` and `bmad-sprint-planning` turn the specs
-  into tracked stories.
+- `bmad-ticket` turns the specs into ordered entries and tracks their joined plans.
 
 Nothing downstream reinterprets the PRD. If a spec needs an answer the PRD
 does not give, the answer goes into the PRD first; the spec is re-run after.
@@ -60,18 +59,15 @@ Linear, and a review cadence, and all of it stays.
   same requirements in the shape the later skills read, with `[ASSUMPTION]`
   tags on anything it had to fill in. After that, the copy your reviewers
   already edit is the source. When it changes, re-run `bmad-prd` in
-  **Update** mode pointing at it and let the skill bring `prd.md` in line;
-  never edit `prd.md` by hand to catch up.
+  **Update** mode pointing at it and let the skill bring the PRD in line;
+  never edit the PRD by hand to catch up.
 - **The same holds for design and architecture.** A design system, an
   existing architecture document, or a live codebase is what `bmad-ux` and
   `bmad-architecture` start from. On an existing system the architecture
   skill reads the code and records the conventions already there rather than
   proposing new ones.
 - **Your tracker stays your tracker.** Jira remains where the organization
-  plans, reports, and reviews. The skills read and write one file,
-  `sprint-status.yaml`, and it holds only story status and open action items.
-  There is no automatic sync in either direction; treat that file as the
-  engineering-side view and update it when the tracker changes.
+  plans, reports, and reviews. `bmad-ticket` publishes leaf files when needed; build status lives in local joined plans. Tracker status is mirrored separately and never makes a build skip work.
 - **Your reviews stay your reviews.** The five sign-off moments below are
   where the skills produce something reviewable. Put your existing approvals
   at those points and the documents the skills write become the material
@@ -85,11 +81,11 @@ regenerated from it.
 
 | Role                     | Runs                                                                                              | Owns                                                                      |
 | ------------------------ | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| Product manager          | Brainstorming, Forge Idea, Deep Recon, then `bmad-product-brief` or `bmad-prfaq`, then `bmad-prd` | `prd.md` and its update cycle; the one-pager the steering committee reads |
+| Product manager          | Brainstorming, Forge Idea, Deep Recon, then `bmad-product-brief` or `bmad-prfaq`, then `bmad-prd` | The PRD and its update cycle; the one-pager the steering committee reads  |
 | Designer                 | `bmad-ux`                                                                                         | `DESIGN.md`, `EXPERIENCE.md`                                              |
 | Tech lead or architect   | `bmad-architecture`                                                                               | The architecture spine                                                    |
-| One engineer, per epic   | `bmad-spec`, Build per story, `bmad-retrospective`                                                | That epic: `SPEC.md`, `stories.yaml`, its verdict                         |
-| Whoever tracks the whole | `bmad-sprint-planning`                                                                            | `sprint-status.yaml`, open action items                                   |
+| One engineer, per epic   | `bmad-spec`, `bmad-ticket`, Build per story, `bmad-retrospective`                      | That epic: its spec, its `tickets.toml`, its verdict                      |
+| Whoever tracks the whole | `bmad-ticket`                                                                            | The ticket tree and plan statuses                                   |
 
 The rows are roles, not headcount. One person can hold several; what matters
 is that each document has exactly one owner, because each has exactly one
@@ -108,7 +104,7 @@ gates.
 | PRFAQ verdict             | Whether the concept is strong enough to resource                      | Writing the PRD              |
 | PRD validate              | A findings report on the PRD without changing it                      | Design and architecture work |
 | Architecture spine review | The decisions every epic will follow, with alternatives weighed       | Writing specs for the epics  |
-| Readiness gate            | Could a developer implement these stories without inventing decisions | Generating sprint tracking   |
+| Ticket-breakdown approval | The entries, requirement coverage, and validated dependencies         | Starting the agreed work     |
 | Retrospective verdict     | Did the epic meet its own acceptance criteria                         | Starting the next epic       |
 
 Every one of these produces a written result, so the approval has something to
@@ -143,11 +139,11 @@ They will. The path for a change is the same as the path for the original:
 1. Run `bmad-prd` in **Update** mode with the change signal. It surfaces
    conflicts with earlier decisions before applying anything.
 2. If the change touches a cross-epic decision, update the spine.
-3. Re-run `bmad-spec` for each affected epic. It updates `SPEC.md` in place
+3. Re-run `bmad-spec` for each affected epic. It updates the spec in place
    and keeps capability IDs stable, so stories that are unaffected stay
    unaffected.
-4. Re-run Story Breakdown or `bmad-sprint-planning` for the affected epics.
-   Regenerating tracking is safe; finished work stays finished.
+4. For the affected epics, re-slice the stories `bmad-spec` names as no longer
+   matching, then revise the remaining breakdown with `bmad-ticket`. Keep historical plans and completed states.
 
 For a change large enough to threaten the plan itself, run
 `bmad-correct-course` before touching documents.

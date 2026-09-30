@@ -169,7 +169,7 @@ code = "RC"
 description = "Run compliance pre-check"
 prompt = """
 Read {project-root}/_bmad/custom/compliance-checklist.md
-and scan all documents in {planning_artifacts} against it.
+and scan all documents in {output_folder}/{active_initiative} against it.
 """
 ```
 
@@ -219,25 +219,13 @@ on_complete = "Summarize the brief in three bullets and offer to email it via th
 ```
 
 Individual workflows add fields on top — output paths, templates, toggles —
-and each follows the shape rules above. `bmad-code-review` ships
-`[[workflow.review_layers]]`, keyed by `id`. This override disables one
-shipped layer and adds another; the skill skips a layer whose
-`instruction` is empty, so nothing is deleted. See
-[Review a Change](../build/review-a-change.md) for empty `instruction`,
-`when`, and a new `id`.
+and each follows the shape rules above. For example, `bmad-code-review`
+exposes `review`, the default review depth:
 
 ```toml
 # _bmad/custom/bmad-code-review.toml
-[[workflow.review_layers]]
-id = "blind-hunter"
-instruction = ""
-
-[[workflow.review_layers]]
-id = "security-bot"
-name = "Security bot"
-instruction = """
-Run the team reviewer via bash on {diff_file} and return its findings as a Markdown list.
-"""
+[workflow]
+review = "quick"
 ```
 
 Read a workflow's `customize.toml` to see the fields it exposes. If the
@@ -256,6 +244,31 @@ sequence, so you know when each hook fires:
 
 The workflow body begins after step 6.
 
+## Override one rendered invocation
+
+To change a skill's customization for one run only, add `--set key=value`
+arguments or an `--overrides <file.toml>` file to the `render_skill.py`
+command in its `SKILL.md`. Persistent project and user files stay as they
+are.
+
+```bash
+uv run /abs/project/_bmad/scripts/render_skill.py \
+  --project-root /abs/project \
+  --skill /abs/path/to/bmad-build \
+  --overrides ./invocation.toml \
+  --set 'workflow.on_complete=Summarize the result in three bullets.'
+```
+
+Keys are dotted parameter paths such as `workflow.on_complete`. The
+override file has the same shape as the skill's `customize.toml`. Both
+layer on top of the persistent files, and `--set` wins over the file.
+
+String values can be written as plain text. Other types use TOML syntax:
+
+```bash
+--set 'workflow.persistent_facts=["Additional context"]'
+```
+
 ## Central configuration
 
 Per-skill files cover one agent or workflow. Install answers and the agent
@@ -265,7 +278,7 @@ roster live in four TOML files:
 _bmad/config.toml               (installer-owned)  team scope: install answers + agent roster
 _bmad/config.user.toml          (installer-owned)  user scope: user_name, language, skill level
 _bmad/custom/config.toml        (human-authored)   team overrides (committed)
-_bmad/custom/config.user.toml   (human-authored)   personal overrides (gitignored)
+_bmad/custom/config.user.toml   (human-authored)   personal overrides (gitignored), including `[core] active_initiative`
 ```
 
 **Four layers**, merged with the same shape rules:
@@ -318,14 +331,14 @@ icon = "🖖"
 description = "Bold, rule-bending commander. Speaks in dramatic pauses."
 ```
 
-**Override a module install setting.** The override wins over whatever
-each developer answered at install:
+**Override an install setting.** The override wins over whatever each
+developer has in their own config:
 
 ```toml
 # _bmad/custom/config.toml
 
-[modules.bmm]
-planning_artifacts = "/shared/org-planning-artifacts"
+[core]
+output_folder = "/shared/org-bmad-output"
 ```
 
 **Which surface to use:**
@@ -338,6 +351,7 @@ planning_artifacts = "/shared/org-planning-artifacts"
 | Rebrand an agent's public descriptor | Central: `_bmad/custom/config.toml` `[agents.<code>]` |
 | Add a custom or fictional agent to the roster | Central: `_bmad/custom/config.*.toml` new `[agents.<code>]` |
 | Pin team-enforced install settings | Central: `_bmad/custom/config.toml` `[modules.<code>]` or `[core]` |
+| Choose which initiative your documents and tickets go to | Central: `_bmad/custom/config.user.toml` `[core] active_initiative`, or ask the `bmad` skill to switch it |
 
 ## Check what resolved
 

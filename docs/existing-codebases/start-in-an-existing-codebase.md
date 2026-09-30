@@ -17,13 +17,11 @@ ordinary change — an agent doing a small request should not even be
 able to find it by accident.
 
 For a small change, use `[bmad-build](../build/build-a-change.md)`.
-For one that needs several coding sessions, run `bmad-spec`, then a
-Build for each piece, then
-optionally `bmad-retrospective`. If it is bigger than that, treat it as a project and follow [Choose a Planning Path](../plan/choose-a-planning-path.md).
+For one that needs several coding sessions, run `bmad-spec`, plan its entries with `bmad-ticket`, and Build each entry directly. Then run `bmad-retrospective` on the epic. Keep its joined plans as live status and evidence. If it is bigger than that, treat it as a project and follow [Choose a Planning Path](../plan/choose-a-planning-path.md).
 
 Too little planning costs one Build run: Build looks at the code
 first, and stops to ask when it cannot settle the intent. Too much
-planning costs documents nobody reads. When unsure, ask `bmad-help`
+planning costs documents nobody reads. When unsure, ask `bmad`
 rather than deciding alone. It inspects the project and answers
 questions like "I have an existing Rails app, where should I start?"
 It also runs at the end of every workflow to say what comes next.

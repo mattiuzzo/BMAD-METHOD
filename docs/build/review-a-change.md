@@ -17,12 +17,14 @@ By the time it finishes, a round of review and fixing has already
 happened.
 
 If you still suspect there is more to find, run `bmad-build` again and
-hand it the spec from that run — the one already marked `status: done`.
+hand it the plan from that run — the one it left at `status: built`.
 That skips straight to review and triage, and you can repeat it as many
-times as you want. Stop when the findings are mostly low-value notes
-about exotic corner cases. That is accidental complexity, not quality.
+times as you want. Once you mark the ticket done, the build treats its
+plan as context for new work instead. Stop when the findings are mostly
+low-value notes about exotic corner cases. That is accidental
+complexity, not quality.
 Non-trivial findings on a third pass of agentic review usually mean
-something is wrong upstream of this change: a weak spec, a
+something is wrong upstream of this change: a weak plan, a
 contradiction, or ambiguity in the rules. Fix that instead of running
 another pass.
 
@@ -51,7 +53,12 @@ run code review
 /bmad-code-review Review https://github.com/org/repo/pull/42
 ```
 
-The skill writes a unified diff to a file, confirms the target and spec
+With no target named, it looks in the ticket tree for tickets in review
+and offers them. Pick one and it reviews everything since the
+`baseline_revision` recorded in that ticket's plan, with the plan as the
+intent. You can also hand it a plan file directly.
+
+The skill writes a unified diff to a file, confirms the target and plan
 context with you, then launches the reviewers. This works best on a
 platform that can spawn subagents, or at least call another model from
 the command line and wait for a result.
@@ -72,41 +79,28 @@ every layer has reported, triage judges each finding on its own:
 
 Patch is an unambiguous code fix. Defer is a real pre-existing issue that
 is not this change. Decision needed is an ambiguous choice that requires
-you. Without a spec, decision needed is not used — those findings go to
+you. Without a plan, decision needed is not used — those findings go to
 patch or defer.
 
-You get a findings summary. Without a spec, that listing stays in the
-chat. You choose whether to apply patches.
+You get a findings summary. With a plan, each run appends a dated block
+of findings to the plan's `## Code Review` section; without one, the
+listing stays in the chat. You choose whether to apply patches. The
+review never changes the ticket's status: marking it done is yours.
 
-## Customize the Layers
+## Customize the Lenses
 
-The shipped lenses are a starting point. Start `bmad-customize` and
-ask what you can change.
+You can choose review depth: `thorough` or `quick`.
 
-Override `[[workflow.review_layers]]` in
-`_bmad/custom/bmad-code-review.toml`. The skill ships four layers:
-`blind-hunter`, `edge-case-hunter`, `verification-gap`, and
-`acceptance-auditor`. Empty `instruction` on an existing `id` disables
-that layer. A `when` field gates a layer. A new `id` appends.
-`instruction` may be bash.
+**Thorough** is the default: several reviewers, each with a different
+lens. Slow, expensive, tuned to find as many problems as possible.
 
-```toml
-# _bmad/custom/bmad-code-review.toml
-[[workflow.review_layers]]
-id = "blind-hunter"
-instruction = ""
-[[workflow.review_layers]]
-id = "acceptance-auditor"
-when = 'Only when {review_mode} = "full".'
-[[workflow.review_layers]]
-id = "security-bot"
-name = "Security bot"
-instruction = """
-Run the team reviewer via bash on {diff_file} and return its findings as a Markdown list.
-"""
-```
+**Quick** is a single reviewer, several times cheaper and somewhat
+faster. Say `/bmad-code-review quick` to use it for a run.
 
-For how overrides merge, see [Customize BMad](../customize/customize-bmad.md).
+Different situations call for different review breadth, depth and cost.
+You can change the default from thorough to quick, add your own
+reviewers, replace or turn off the ones you get out of the box, run
+some on another model. Start `bmad-customize` and ask what is possible.
 
 ## Why Does Review Take Forever?
 
@@ -119,10 +113,10 @@ Three explanations:
 ### Exhaustive on purpose
 
 The default assumes an average bug escaping into production is worth
-more than an hour of inference. You can turn that down, or off — see
-[Customize the Layers](#customize-the-layers). Turning review off is
-reasonable for a throwaway prototype. A long review can also run
-offline.
+more than an hour of inference. You can turn that down — see
+[Customize the Lenses](#customize-the-lenses). Skipping review in
+`bmad-build` is reasonable for a throwaway prototype. A long review can
+also run offline.
 
 It is a bad idea to let teammates look at unreviewed LLM-generated
 code. It is a worse idea to put that code into production without the
@@ -173,4 +167,4 @@ test as above: take several interesting diffs, run an A/B, and either
 pick one, or make the built-in command an extra lens. If you find
 something that genuinely adds quality findings without creating too
 much noise, it is almost always worth adding as a lens — see
-[Customize the Layers](#customize-the-layers).
+[Customize the Lenses](#customize-the-lenses).

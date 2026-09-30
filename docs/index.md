@@ -25,6 +25,11 @@ building with no planning at all.
 
 ## Find Your Starting Point
 
+![The BMad delivery loop: a vague notion starts at Clarify, a big clear idea at Plan, and a small change at Build and verify; Learn and adjust loops back to Plan](/diagrams/bmad-delivery-loop.svg)
+
+Every path runs the same loop. Bigger work enters it earlier and goes round it
+more often; it does not become a different way of delivering.
+
 **You are not sure how much process the change needs.**
 [Choose a Planning Path](./plan/choose-a-planning-path.md).
 
@@ -54,6 +59,6 @@ See [Customize BMad](./customize/customize-bmad.md) and
 [Adopt BMad Across a Team](./customize/adopt-bmad-across-a-team.md).
 
 :::tip[Unsure where to start?]
-Run `bmad-help`. If that is not enough, see
+Run `bmad`. If that is not enough, see
 [Get Answers About BMad](./start/get-answers-about-bmad.md).
 :::

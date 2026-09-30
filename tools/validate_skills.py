@@ -11,13 +11,13 @@ What it checks:
 - SKILL-01: SKILL.md exists
 - SKILL-02: SKILL.md frontmatter has name
 - SKILL-03: SKILL.md frontmatter has description
-- SKILL-04: name format (lowercase, hyphens, no forbidden substrings)
+- SKILL-04: name format (lowercase, hyphens, no forbidden substrings; `bmod-` for a module record)
 - SKILL-05: name matches directory basename
-- SKILL-06: description quality (length, "Use when"/"Use if")
+- SKILL-06: description quality (length, "Use when"/"Use if"; the fixed text for a module record)
 - SKILL-07: SKILL.md has body content after frontmatter
 - PATH-02: no installed_path variable
 - SEQ-02: no time estimates
-- TPL-01: template files must not contain compile-time {{.var}} substitutions
+- TPL-01: template files must not contain render-time {{ config.* }} / {{ workflow.* }} expressions
 
 Usage:
   uv run --python 3.11 tools/validate_skills.py                    # All skills, human-readable
@@ -33,16 +33,21 @@ import json
 import os
 import re
 import sys
+import tomllib
 
 sys.dont_write_bytecode = True
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC_DIR = os.path.join(PROJECT_ROOT, "src")
+SRC_DIR = os.path.join(PROJECT_ROOT, "skills")
 
 # JS RegExp#toString() forms — Python's re.Pattern repr is not load-bearing for messages.
 NAME_REGEX_DISPLAY = r"/^(?:bmad|bmad-[a-z0-9]+(?:-[a-z0-9]+)*)$/"
 
 NAME_REGEX = re.compile(r"^(?:bmad|bmad-[a-z0-9]+(?:-[a-z0-9]+)*)$")
+# A module record: a folder whose bmod.toml has [bmod] and no [skill]. Nobody runs it.
+RECORD_NAME_REGEX_DISPLAY = r"/^bmod-[a-z0-9]+(?:-[a-z0-9]+)*$/"
+RECORD_NAME_REGEX = re.compile(r"^bmod-[a-z0-9]+(?:-[a-z0-9]+)*$")
+RECORD_DESCRIPTION = "Required bmod metadata. Never invoke this skill."
 TIME_ESTIMATE_PATTERNS = [
     re.compile(r"takes?\s+\d+\s*min", re.I),
     re.compile(r"~\s*\d+\s*min", re.I),
@@ -50,7 +55,7 @@ TIME_ESTIMATE_PATTERNS = [
     re.compile(r"\bETA\b"),
 ]
 TEMPLATE_FILENAME_REGEX = re.compile(r"template", re.I)
-COMPILE_TIME_SUB_REGEX = re.compile(r"\{\{\.\w+\}\}")
+COMPILE_TIME_SUB_REGEX = re.compile(r"\{\{-?\s*(?:config|workflow)\.[^}]*\}\}")
 INSTALLED_PATH_RE = re.compile(r"installed_path", re.I)
 USE_WHEN_RE = re.compile(r"use\s+when\b", re.I)
 USE_IF_RE = re.compile(r"use\s+if\b", re.I)
@@ -74,7 +79,8 @@ def escape_table_cell(s: str) -> str:
 
 
 def _relpath(to_path: str, start: str) -> str:
-    rel = os.path.relpath(to_path, start)
+    # A reported path is a repo path: "/" on every platform.
+    rel = os.path.relpath(to_path, start).replace(os.sep, "/")
     return "" if rel == "." else rel
 
 
@@ -108,10 +114,10 @@ def _frontmatter_block(content: str) -> str | None:
     if not trimmed.startswith("---"):
         return None
 
-    end_index = trimmed.find("\n---\n", 3)
+    end_index = trimmed.find(f"{os.linesep}---{os.linesep}", 3)
     if end_index == -1:
-        if trimmed.endswith("\n---"):
-            end_index = len(trimmed) - 4
+        if trimmed.endswith(f"{os.linesep}---"):
+            end_index = len(trimmed) - len(os.linesep) - 3
         else:
             return None
 
@@ -119,9 +125,7 @@ def _frontmatter_block(content: str) -> str | None:
 
 
 def _strip_quotes(value: str) -> str:
-    if (value.startswith("'") and value.endswith("'")) or (
-        value.startswith('"') and value.endswith('"')
-    ):
+    if (value.startswith("'") and value.endswith("'")) or (value.startswith('"') and value.endswith('"')):
         return value[1:-1]
     return value
 
@@ -134,7 +138,7 @@ def parse_frontmatter(content: str) -> dict[str, str] | None:
         return {}
 
     result: dict[str, str] = {}
-    for line in fm_block.split("\n"):
+    for line in fm_block.split(os.linesep):
         colon_index = line.find(":")
         if colon_index == -1:
             continue
@@ -158,7 +162,7 @@ def parse_frontmatter_multiline(content: str) -> dict[str, str] | None:
     current_key: str | None = None
     current_value = ""
 
-    for line in fm_block.split("\n"):
+    for line in fm_block.split(os.linesep):
         colon_index = line.find(":")
         # New key: column 0 (no leading whitespace) and colon not at index 0
         if colon_index > 0 and line[:1] not in (" ", "\t"):
@@ -201,7 +205,7 @@ def safe_read_file(file_path: str, findings: list[dict], rel_file: str | None) -
 
 
 def _blank(match: re.Match[str]) -> str:
-    return re.sub(r"[^\n]", "", match.group(0))
+    return re.sub(r"[^\r\n]", "", match.group(0))
 
 
 def strip_code_blocks(content: str) -> str:
@@ -271,6 +275,15 @@ def collect_skill_files(skill_dir: str, findings: list[dict]) -> list[str]:
 
 
 # --- Rule Checks ---
+
+
+def is_module_record(skill_dir: str) -> bool:
+    try:
+        with open(os.path.join(skill_dir, "bmod.toml"), "rb") as handle:
+            data = tomllib.load(handle)
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError):
+        return False
+    return "bmod" in data and "skill" not in data
 
 
 def validate_skill(skill_dir: str) -> list[dict]:
@@ -348,15 +361,18 @@ def validate_skill(skill_dir: str) -> list[dict]:
     description = skill_fm.get("description") if skill_fm else None
 
     is_deprecated = isinstance(description, str) and bool(DEPRECATED_RE.search(description))
+    is_record = is_module_record(skill_dir)
+    name_regex = RECORD_NAME_REGEX if is_record else NAME_REGEX
+    name_display = RECORD_NAME_REGEX_DISPLAY if is_record else NAME_REGEX_DISPLAY
 
-    if name and not NAME_REGEX.search(name):
+    if name and not name_regex.search(name):
         findings.append(
             _finding(
                 "SKILL-04",
                 "name Format",
                 "HIGH",
                 "SKILL.md",
-                f'name "{name}" does not match pattern: {NAME_REGEX_DISPLAY}',
+                f'name "{name}" does not match pattern: {name_display}',
                 "Rename to comply with lowercase letters, numbers, and hyphens only (max 64 chars).",
             )
         )
@@ -386,7 +402,19 @@ def validate_skill(skill_dir: str) -> list[dict]:
                 )
             )
 
-        if not is_deprecated and not USE_WHEN_RE.search(description) and not USE_IF_RE.search(description):
+        if is_record:
+            if description != RECORD_DESCRIPTION:
+                findings.append(
+                    _finding(
+                        "SKILL-06",
+                        "description Quality",
+                        "MEDIUM",
+                        "SKILL.md",
+                        f'a module record\'s description must be exactly "{RECORD_DESCRIPTION}"',
+                        "Replace the description with the fixed text.",
+                    )
+                )
+        elif not is_deprecated and not USE_WHEN_RE.search(description) and not USE_IF_RE.search(description):
             findings.append(
                 _finding(
                     "SKILL-06",
@@ -401,10 +429,10 @@ def validate_skill(skill_dir: str) -> list[dict]:
     trimmed = skill_content.lstrip()
     body_start = -1
     if trimmed.startswith("---"):
-        end_idx = trimmed.find("\n---\n", 3)
+        end_idx = trimmed.find(f"{os.linesep}---{os.linesep}", 3)
         if end_idx != -1:
-            body_start = end_idx + 4
-        elif trimmed.endswith("\n---"):
+            body_start = end_idx + len(os.linesep) + 3
+        elif trimmed.endswith(f"{os.linesep}---"):
             body_start = len(trimmed)
     else:
         body_start = 0
@@ -445,7 +473,7 @@ def validate_skill(skill_dir: str) -> list[dict]:
             )
 
         stripped = strip_code_blocks(content)
-        for i, line in enumerate(stripped.split("\n")):
+        for i, line in enumerate(stripped.split(os.linesep)):
             if INSTALLED_PATH_RE.search(line):
                 findings.append(
                     _finding(
@@ -470,7 +498,7 @@ def validate_skill(skill_dir: str) -> list[dict]:
             continue
         stripped = strip_code_blocks(content)
 
-        for i, line in enumerate(stripped.split("\n")):
+        for i, line in enumerate(stripped.split(os.linesep)):
             for pattern in TIME_ESTIMATE_PATTERNS:
                 if pattern.search(line):
                     findings.append(
@@ -498,17 +526,17 @@ def validate_skill(skill_dir: str) -> list[dict]:
         if content is None:
             continue
 
-        for i, line in enumerate(content.split("\n")):
+        for i, line in enumerate(content.split(os.linesep)):
             match = COMPILE_TIME_SUB_REGEX.search(line)
             if match:
                 findings.append(
                     _finding(
                         "TPL-01",
-                        "Template files must not contain compile-time substitutions",
+                        "Template files must not contain render-time expressions",
                         "HIGH",
                         rel_file,
-                        f"Template file contains compile-time substitution `{match.group(0)}` — this would be baked at render time and leak a machine-local value into every spec produced from the template.",
-                        "Remove the `{{.var}}` reference. Use single-curly `{var}` if the value should be resolved at LLM runtime by the consumer of the generated spec.",
+                        f"Template file contains render-time expression `{match.group(0)}` — this would be baked at render time and leak a machine-local value into every spec produced from the template.",
+                        "Remove the `{{ config.key }}` or `{{ workflow.key }}` expression. Use single-curly `{var}` if the value should be resolved at LLM runtime by the consumer of the generated spec.",
                         line=i + 1,
                     )
                 )
@@ -656,7 +684,7 @@ def run(
     strict: bool = False,
     json_output: bool = False,
 ) -> int:
-    src_dir = os.path.join(project_root, "src")
+    src_dir = os.path.join(project_root, "skills")
     github_actions = bool(os.environ.get("GITHUB_ACTIONS"))
 
     if skill_dir is not None:
@@ -695,4 +723,8 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    if sys.platform == "win32":
+        # Piped output on Windows defaults to a legacy code page, not UTF-8.
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
     sys.exit(main())

@@ -1,50 +1,63 @@
 name: Quality & Validation
 
-# Runs comprehensive quality checks on all PRs and pushes to main:
-# - Prettier (formatting)
-# - ESLint (linting)
-# - markdownlint (markdown quality)
-# - Installation component tests (compilation)
-# - Retrospective Python tests
-# Keep this workflow aligned with `npm run quality` in `package.json`.
+# Keep this workflow aligned with `tools/quality.py`.
 
-"on":
+on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
-    branches: ["**"]
+    branches: ['**']
+    # `edited` covers a base-branch change (e.g. a PR retargeted from main to dev);
+    # the job condition skips title/body edits.
+    types: [opened, synchronize, reopened, edited]
   workflow_dispatch:
 
 jobs:
-  prettier:
-    runs-on: ubuntu-latest
+  python:
+    if: github.event.action != 'edited' || github.event.changes.base != null
+    strategy:
+      # Each platform reports its own result; one failing does not cancel the other.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
         with:
-          node-version-file: ".nvmrc"
-          cache: "npm"
+          enable-cache: true
 
       - name: Install dependencies
-        run: npm ci
+        run: uv sync --frozen
 
-      - name: Prettier format check
-        run: npm run format:check
+      - name: Cache pre-commit environments
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
 
-  eslint:
+      - name: Lint, validate, test
+        run: uv run --frozen pre-commit run --all-files --show-diff-on-failure
+
+  docs-site:
+    if: github.event.action != 'edited' || github.event.changes.base != null
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs-site
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version-file: ".nvmrc"
-          cache: "npm"
+          node-version-file: docs-site/.nvmrc
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -52,75 +65,15 @@ jobs:
       - name: ESLint
         run: npm run lint
 
-  markdownlint:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: ".nvmrc"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: markdownlint
-        run: npm run lint:md
-
-  docs:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: ".nvmrc"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
+      - name: Prettier format check
+        run: npm run format:check
 
       - name: Build documentation
-        # Note: build-docs.mjs runs link validation internally before building
-        run: npm run docs:build
+        # Note: docs-site/scripts/build-docs.mjs runs link validation internally before building
+        run: npm run build
 
-  validate:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Validate sidebar order
+        run: npm run validate-sidebar
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: ".nvmrc"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v6
-
-      - name: Test agent compilation components
-        run: npm run test:install
-
-      - name: Test workflow renderers
-        run: npm run test:renderer
-
-      - name: Test retrospective scripts
-        run: npm run test:retrospective
-
-      - name: Test sprint-planning scripts
-        run: npm run test:sprint-planning
-
-      - name: Validate file references
-        run: npm run validate:refs
-
-      - name: Validate skills
-        run: npm run validate:skills
+      - name: Test docs-site
+        run: npm test

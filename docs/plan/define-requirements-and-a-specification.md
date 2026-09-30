@@ -18,7 +18,7 @@ when several people must agree on what the product is or several epics must
 stay aligned; [Plan Inside an Organization](./plan-inside-an-organization.md)
 covers that setting. This page covers what each document is for and which
 skill writes it. None of them replaces the spec: every epic still ends up as a
-`SPEC.md` that Build reads, and when there is a PRD, that is where the spec's
+`spec-<slug>.md` that Build reads, and when there is a PRD, that is where the spec's
 answers come from.
 
 The brief, PRD, and UX skills steer the same way. Each opens with a brain
@@ -36,7 +36,7 @@ project does not get investor-grade rigor; a pitch input does. The coach reads
 the stakes early and calibrates how hard it pushes.
 
 Use it when your concept is relatively clear and you want it written down
-before a PRD. It produces `brief.md` plus `addendum.md`, which holds the depth
+before a PRD. It produces `brief-<slug>.md` plus `addendum.md`, which holds the depth
 that belongs later rather than in the brief: rejected alternatives, options
 considered, technical constraints, sizing data. `bmad-prd` reads both. For
 serious market sizing or competitor teardowns it hands you to
@@ -97,7 +97,7 @@ the brief or the PRFAQ instead.
 ## Spec: The Contract Implementation Reads
 
 Run `bmad-spec` to turn an intent into a short contract that Build reads.
-`SPEC.md` has five fields: Why, Capabilities (each with an intent and a
+`spec-<slug>.md` has five fields: Why, Capabilities (each with an intent and a
 success condition), Constraints, Non-goals, and Success signal. Tables,
 diagrams, glossaries, and documents other skills already wrote sit beside it;
 the spec points at them rather than copying them.
@@ -109,26 +109,34 @@ through the five fields. Input too thin to use ("an app for hikers") is sent
 to `bmad-prd`. Input too large is the other failure: a few tens of thousands
 of tokens is the practical ceiling, so condense a pile of material first.
 
-`bmad-spec` is the only writer of `SPEC.md`. Do not hand-edit it; run the
+`bmad-spec` is the only writer of the spec. Do not hand-edit it; run the
 skill again with the change and it updates the spec in place, keeping
 capability IDs stable. The PRD, UX, and architecture skills can run in any
 order and feed the same spec. After every run it reports assumptions it made
 and open questions it could not answer, for you to resolve.
 
-On request, **Story Breakdown** turns one spec into an epic. It walks the
-capabilities and constraints with you, proposes a story per independently
-reviewable slice, and asks for each one whether you want a checkpoint before or
-after implementation. The result is the ordered `stories.yaml` beside
-`SPEC.md`. That is the whole planning set for a spec-backed epic; see
+`bmad-spec` does not split a spec into stories. When a spec it writes reads as
+several slices, it offers once to hand off to `bmad-ticket`. To
+split a spec at any time, run `bmad-ticket` with the spec folder.
+It plans one epic with you in build order and records the stories in the
+epic's `tickets.toml`. Each story cites the spec's capability IDs. A constraint or design decision that comes up while slicing
+goes back into the spec as an update. See
 [Choose a Planning Path](./choose-a-planning-path.md#1-start-epic-sized-work)
 for how the epic then runs.
 
+`bmad-spec` delegates story breakdown to `bmad-ticket`. To run
+the planned stories unattended, explicitly dispatch each ticket to
+[`bmad-build-auto`](../build/autonomous-development-loops.md) as `ticket <ref>`,
+one run per ticket. No leaf file needs to be pulled first.
+
 :::note[What each skill produces]
-`bmad-product-brief`: `brief.md` and `addendum.md`. `bmad-prfaq`: a PRFAQ
-document with a short summary for the PRD or spec. `bmad-prd`: `prd.md` and
-`addendum.md`, or a validation report. `bmad-spec`: `SPEC.md` plus supporting
-files under `specs/spec-<slug>/`, and `stories.yaml` on request. Exact paths
-and options belong to each skill; see
+`bmad-product-brief`: `brief-<slug>.md` and `addendum.md`. `bmad-prfaq`: a
+PRFAQ document with a short summary for the PRD or spec. `bmad-prd`:
+`prd-<slug>.md` and `addendum.md`, or a validation report. `bmad-spec`:
+`spec-<slug>.md` plus supporting files. Each lands in its own `<type>-<slug>/`
+folder in the active initiative's folder, or in the output folder when no
+initiative is active. Exact paths and options belong to each
+skill; see
 [Planning Skills and What They Produce](./choose-a-planning-path.md#planning-skills-and-what-they-produce).
 :::
 
@@ -136,5 +144,6 @@ and options belong to each skill; see
 
 With a PRD in hand for multi-epic work, decide whether the work needs shared
 design decisions: [Design UX and Architecture](./design-ux-and-architecture.md).
-With a spec in hand for one epic, ask for Story Breakdown and go to
+With a spec in hand for one epic, run `bmad-ticket` with the spec
+folder and go to
 [Break Work into Stories and Track It](./break-work-into-stories-and-track-it.md).

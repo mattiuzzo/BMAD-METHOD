@@ -2,13 +2,8 @@ name: Deploy Documentation
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - "docs/**"
-      - "website/**"
-      - "tools/build-docs.mjs"
-      - ".github/workflows/docs.yaml"
+    branches: [dev]
+    paths: [docs/**, docs-site/**, .github/workflows/docs.yaml]
   workflow_dispatch:
 
 permissions:
@@ -17,25 +12,29 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: pages
   # No big win in setting this to true — risk of cancelling a deploy mid-flight.
   cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs-site
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # Full history needed for Starlight's lastUpdated timestamps (git log)
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version-file: ".nvmrc"
-          cache: "npm"
+          node-version-file: docs-site/.nvmrc
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -45,10 +44,10 @@ jobs:
           # Override site URL from GitHub repo variable if set
           # Otherwise, astro.config.mjs will compute from GITHUB_REPOSITORY
           SITE_URL: ${{ vars.SITE_URL }}
-        run: npm run docs:build
+        run: npm run build
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: build/site
 
@@ -61,4 +60,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

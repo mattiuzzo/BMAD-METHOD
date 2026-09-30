@@ -40,7 +40,7 @@ One file applies to every workflow the agent runs — build, code review,
 test generation — and every engineer who pulls the repo inherits it.
 
 **Example:** Amelia always uses Context7 for library docs and falls back to
-Linear when a story is not in the epics list.
+Linear when a ticket is not in the ticket tree.
 
 ```toml
 # _bmad/custom/bmad-agent-dev.toml
@@ -49,7 +49,7 @@ Linear when a story is not in the epics list.
 
 persistent_facts = [
   "For any library documentation lookup (React, TypeScript, Zod, Prisma, etc.), call the context7 MCP tool (`mcp__context7__resolve_library_id` then `mcp__context7__get_library_docs`) before relying on training-data knowledge. Up-to-date docs trump memorized APIs.",
-  "When a story reference isn't found in {planning_artifacts}/epics.md, search Linear via `mcp__linear__search_issues` using the story ID or title before asking the user to clarify. If Linear returns a match, treat it as the authoritative story source.",
+  "When a ticket reference cannot be resolved in the ticket tree, search Linear via `mcp__linear__search_issues` using the story ID or title before asking the user to clarify. If Linear returns a match, treat it as the authoritative story source.",
 ]
 ```
 
@@ -208,20 +208,18 @@ BMad agents in the same party.
 
 ### 5c. Pin team install settings
 
-**Keys:** `[modules.bmm]` paths and `[core] document_output_language`.
+**Keys:** `[core] output_folder` and `[core] document_output_language`.
 
-The installer asks each developer for values such as the planning
-artifacts path. When the team needs one answer, pin it here; it overrides
-whatever a developer typed at install time.
+When the team needs one answer for a setting such as where BMad writes its
+output, pin it here; it overrides whatever a developer has in their own
+config. `output_folder` holds every initiative folder, the ticket tree, and
+`backlog/`, so pinning it moves all of them together.
 
 ```toml
 # _bmad/custom/config.toml
 
-[modules.bmm]
-planning_artifacts = "{project-root}/shared/planning"
-implementation_artifacts = "{project-root}/shared/implementation"
-
 [core]
+output_folder = "{project-root}/shared/bmad-output"
 document_output_language = "English"
 ```
 
@@ -297,7 +295,7 @@ array: team entries stack, and each handoff fires independently.
 
 [workflow]
 external_handoffs = [
-  "After finalize, upload prd.md and addendum.md to Confluence via corp:confluence_upload (space_key='PROD', parent_page='PRDs', label='prd', author={user_name}). Capture and surface the returned page URL.",
+  "After finalize, upload the PRD and addendum.md to Confluence via corp:confluence_upload (space_key='PROD', parent_page='PRDs', label='prd', author={user_name}). Capture and surface the returned page URL.",
   "Mirror to Notion via notion:create_page (database_id='abc123', title='PRD: ' + {project_name}).",
 ]
 ```

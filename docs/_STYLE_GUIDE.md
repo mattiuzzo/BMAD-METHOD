@@ -89,9 +89,9 @@ Show in "What You've Accomplished" sections:
 your-project/
 ├── _bmad/                                   # BMad configuration
 ├── _bmad-output/
-│   ├── planning-artifacts/
-│   │   └── PRD.md                           # Your requirements document
-│   └── implementation-artifacts/
+│   └── initiative-checkout/                 # the active initiative
+│       └── prd-checkout/
+│           └── prd-checkout.md              # Your requirements document
 ├── AGENTS.md                                # agent instructions (optional, via bmad-project-context)
 └── ...
 ```
@@ -171,7 +171,7 @@ your-project/
 3. Key Concepts (### subsections)
 4. Comparison Table (optional)
 5. When to Use / When Not to Use (optional)
-6. Diagram (optional - mermaid, 1 per doc max)
+6. Diagram (optional - see Diagrams below, 1 per doc max)
 7. Next Steps (optional)
 ```
 
@@ -201,7 +201,7 @@ your-project/
 1. Title + Hook (what it does)
 2. Quick Facts (optional - "Perfect for:", "Time to:")
 3. When to Use / When Not to Use
-4. How It Works (mermaid diagram optional)
+4. How It Works (diagram optional)
 5. Key Benefits
 6. Comparison Table (optional)
 7. When to Graduate/Upgrade (optional)
@@ -226,6 +226,35 @@ your-project/
 - [ ] Diagrams have clear labels
 - [ ] Links to how-to guides for procedural questions
 - [ ] 2-3 admonitions max per document
+
+
+## Diagrams
+
+Diagrams are hand-authored SVGs, kept in `docs-site/src/diagrams/`, and embedded
+like an image:
+
+```markdown
+![The bmad-build run](/diagrams/build-run.svg)
+```
+
+They are inlined into the page rather than served as `<img>`, so one stylesheet
+themes every diagram in both light and dark. That means a diagram file carries
+**geometry and classes only, never colours** — use the existing vocabulary
+(`node`, `edge`, `gate`, `panel`, `glyph`, and the `n` / `sub` / `k` text
+classes) and a new diagram will match the others without any styling work.
+
+Labels are translated, not redrawn. Give each `<text>` a `data-i18n` key and add
+the strings to the diagram's `<name>.labels.json`; every language then shares one
+drawing, and a translation cannot drift out of shape with the original. Anything
+missing falls back to the English in the SVG.
+
+A README is not a docs page — it loads an SVG as an `<img>`, where no stylesheet
+can reach it — so the ones the READMEs use are exports, in `docs/images/`. After
+changing a source diagram that a README shows, regenerate them:
+
+```bash
+cd docs-site && npm run export-readme-diagrams
+```
 
 ## Reference Structure
 
@@ -374,8 +403,9 @@ Yes. The `bmad-correct-course` workflow handles scope changes mid-implementation
 Before submitting documentation changes:
 
 ```bash
-npm run docs:fix-links            # Preview link format fixes
-npm run docs:fix-links -- --write # Apply fixes
-npm run docs:validate-links       # Check links exist
-npm run docs:build                # Verify no build errors
+cd docs-site
+npm run fix-links                 # Preview link format fixes
+npm run fix-links -- --write      # Apply fixes
+npm run validate-links            # Check links exist
+npm run build                     # Verify no build errors
 ```

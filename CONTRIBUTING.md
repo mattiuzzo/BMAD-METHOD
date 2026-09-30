@@ -41,7 +41,7 @@ BMad strengthens human-AI collaboration through specialized agents and guided wo
 
 ### Bug Reports
 
-After searching, if the bug is unreported, use the [bug report template](https://github.com/bmad-code-org/BMAD-METHOD/issues/new?template=bug_report.md) and include:
+After searching, if the bug is unreported, use the [bug report template](https://github.com/bmad-code-org/BMAD-METHOD/issues/new?template=bug-report.yaml) and include:
 
 - Clear description of the problem
 - Steps to reproduce
@@ -51,7 +51,7 @@ After searching, if the bug is unreported, use the [bug report template](https:/
 
 ### Feature Requests
 
-After searching, use the [feature request template](https://github.com/bmad-code-org/BMAD-METHOD/issues/new?template=feature_request.md) and explain:
+After searching, use the [feature request template](https://github.com/bmad-code-org/BMAD-METHOD/issues/new?template=feature-request.md) and explain:
 
 - What the feature is
 - Why it would benefit the BMad community
@@ -74,7 +74,11 @@ After searching, use the [feature request template](https://github.com/bmad-code
 
 ### Target Branch
 
-Submit PRs to the `main` branch. We use trunk-based development. Every push to `main` auto-publishes to `npm` under the `next` tag. Stable releases are cut ~weekly to the `latest` tag.
+- **Development:** branch from `dev` and target `dev`.
+- `main` is release-only and remains the default branch.
+- **6.12 npm maintenance:** branch from and target `V6.12`, which still ships through npm.
+
+PRs opened against `main` are retargeted to `dev`.
 
 ### PR Size
 
@@ -94,11 +98,11 @@ We will reject PRs that read like raw LLM output: bulk refactors nobody asked fo
 
 1. **Fork** the repository
 2. **Clone** your fork: `git clone https://github.com/YOUR-USERNAME/bmad-method.git`
-3. **Create a branch**: `git checkout -b fix/description` or `git checkout -b feature/description`
+3. **Branch from upstream dev**: add `git remote add upstream https://github.com/bmad-code-org/BMAD-METHOD.git`, run `git fetch upstream dev`, then `git switch -c fix/description upstream/dev` (or use `feature/description`).
 4. **Make changes** — keep them focused
 5. **Commit**: `git commit -m "fix: correct typo in README"`
 6. **Push**: `git push origin fix/description`
-7. **Open PR** from your fork on GitHub
+7. **Open PR** from your fork into `bmad-code-org/BMAD-METHOD` with `dev` as the base branch.
 
 ### PR Description Template
 
@@ -151,25 +155,24 @@ Keep messages under 72 characters. Each commit = one logical change.
 
 - Keep dev agents lean — focus on coding context, not documentation
 - Web/planning agents can be larger with complex tasks
-- Everything is natural language (markdown) — no code in core framework
+- Skills and workflows are natural language (markdown); deterministic helpers are Python scripts run through `uv`
 - Use BMad modules for domain-specific features
-- Validate file references: `npm run validate:refs`
+- Validate file references: `uv run tools/validate_file_refs.py --strict`
 
 ### File-Pattern-to-Validator Mapping
 
 | File Pattern | Validator | Extraction Function |
 | ------------ | --------- | ------------------- |
-| `*.yaml`, `*.yml` | `validate-file-refs.js` | `extractYamlRefs` |
-| `*.md`, `*.xml` | `validate-file-refs.js` | `extractMarkdownRefs` |
-| `*.csv` | `validate-file-refs.js` | `extractCsvRefs` |
+| `*.yaml`, `*.yml` | `validate_file_refs.py` | `extract_yaml_refs` |
+| `*.md`, `*.xml` | `validate_file_refs.py` | `extract_markdown_refs` |
 
 ---
 
 ## Need Help?
 
 - 💬 **Discord**: [Join the community](https://discord.gg/gk8jAdXWmj)
-- 🐛 **Bugs**: Use the [bug report template](https://github.com/bmad-code-org/BMAD-METHOD/issues/new?template=bug_report.md)
-- 💡 **Features**: Use the [feature request template](https://github.com/bmad-code-org/BMAD-METHOD/issues/new?template=feature_request.md)
+- 🐛 **Bugs**: Use the [bug report template](https://github.com/bmad-code-org/BMAD-METHOD/issues/new?template=bug-report.yaml)
+- 💡 **Features**: Use the [feature request template](https://github.com/bmad-code-org/BMAD-METHOD/issues/new?template=feature-request.md)
 
 ---
 

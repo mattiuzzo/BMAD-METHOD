@@ -1,5 +1,43 @@
 # Changelog
 
+## Unreleased
+
+**Every document lands in the active initiative.** Skills write `<type>-<slug>/<type>-<slug>.md` under `output_folder`, inside `initiative-<slug>/` when one is active. The `bmad` skill shows, switches, creates, and clears the active initiative, and `bmad migrate method` moves a v6 project onto the layout.
+
+### 💥 Breaking
+
+* `planning_artifacts` and `implementation_artifacts` are no longer read or seeded. Run `bmad migrate method` on a v6 project.
+* The ticketing store's `root` key is gone; the ticket tree is `{output_folder}/{active_initiative}`. To move the store, set `core.output_folder` in `_bmad/custom/config.toml`.
+* `active_initiative` is now a core setting: it moved from `[modules.bmm]` to `[core]` in `_bmad/custom/config.user.toml`, since core skills such as brainstorming and research also write into the initiative folder. If you set it on a preview build, move the line.
+* `bmad-preview-ticketing` is now `bmad-ticket`, and the forwarder under the old name is gone. Run `bmad setup`: it updates the skills, moves `_bmad/custom/bmad-preview-ticketing.toml` to `bmad-ticket.toml`, offers to delete the old skill, and offers to install `bmad-ticket`.
+
+### ✨ Features
+
+* `bmad setup` cleans up renamed and removed skills. Each module lists them in a `retired.toml` beside its `bmod.toml`; setup offers to delete any still in the project's skills folders, including skills a v6 installer left behind, moves `_bmad/custom/` files to the new name, and says when a customization no longer applies. `removals.txt` is gone.
+* `bmad setup` now moves `_bmad/custom/<old>.toml` and `<old>.user.toml` to a renamed skill's new name without asking, when the new file does not exist yet. It still never changes a value inside a file.
+* `bmad setup` and `bmad status` name the skills of each module you did not install and give one command that installs them.
+* `bmad setup` and `bmad status` cover every skills folder your tool loads, so a module installed in the project is set up while `bmad` is global, and a skill installed twice is reported with an offer to delete the extra copy.
+* `bmad setup` is one flow that also updates and migrates: when a module has a newer version it runs `npx skills update`, and it ends by checking whether any migration applies and asking whether to run it. Asking for status runs only the check.
+
+## v6.12.0 - 2026-09-03
+
+**Build decides how much ceremony a change needs after investigating it, not before.** Simple changes now get a two-section spec and finish in one session.
+
+**Review triage logs a verdict and evidence for every finding**, so nothing gets dropped silently. Several review bugs went with it: layers that returned nothing, serial launches, and re-reviews redoing settled work.
+
+### 💥 Breaking
+
+* `persistent_facts` ships empty. Re-add `project-context.md` to your override if you relied on the auto-load.
+* `{diff_output}` is now `{diff_file}`. Update custom review overrides.
+* Deprecated shims are opt-in on fresh installs. Pass `--shims` to keep them.
+* `bmad-checkpoint-preview` is now `bmad-walkthrough` (`CK` → `WT`). The old ID still forwards.
+* Build no longer auto-triggers on interactive edits, git bookkeeping, or formatting chores.
+* `llms.txt` and `llms-full.txt` are no longer published.
+
+### Also
+
+`bmad-project-context` now adopts a handwritten `AGENTS.md` instead of rewriting it. Polytoken, Grok, and ZCode added to the installer. Docs reorganized by task, Korean translation added. Fixes across customization resolution, review dispatch, and Windows encoding.
+
 ## v6.11.0 - 2026-08-09
 
 ### ✨ Headline
