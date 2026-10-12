@@ -2,17 +2,25 @@
 
 ## Unreleased
 
+**The BMad Builder module joins this repository as Toolsmith, a first draft for v7.** The agent builder, workflow builder, module builder and eval runner that lived in `bmad-bmb` become one module here, `bmod-toolsmith`: one agent, Smithy the Toolsmith (`bmad-toolsmith`), and one skill, `bmad-eval`. Smithy builds a skill, an agent, a memory agent or a module from a conversation about what it is for, who uses it and what it produces; converts a prompt, Cursor rule, GPT or custom command from another tool into a skill; mines a skill from session logs; and edits, reviews, packages, validates and migrates skills that exist, including a v6 module with `module.yaml`. Nothing is written before the user approves a read-back, and after a build five quality lenses run over every file the agent will read and Smithy fixes what they find. `bmad-eval` measures a skill with baseline, variant, quality and trigger runs. Install with `npx skills add bmad-code-org/BMAD-METHOD --skill bmod-toolsmith --skill bmad-toolsmith --skill bmad-eval`.
+
 **Every document lands in the active initiative.** Skills write `<type>-<slug>/<type>-<slug>.md` under `output_folder`, inside `initiative-<slug>/` when one is active. The `bmad` skill shows, switches, creates, and clears the active initiative, and `bmad migrate method` moves a v6 project onto the layout.
 
 ### 💥 Breaking
 
+* Translated documentation is removed. The docs site is English-only, and `/fr/`, `/cs/`, `/ko-kr/`, `/vi-vn/`, and `/zh-cn/` URLs 404.
 * `planning_artifacts` and `implementation_artifacts` are no longer read or seeded. Run `bmad migrate method` on a v6 project.
 * The ticketing store's `root` key is gone; the ticket tree is `{output_folder}/{active_initiative}`. To move the store, set `core.output_folder` in `_bmad/custom/config.toml`.
 * `active_initiative` is now a core setting: it moved from `[modules.bmm]` to `[core]` in `_bmad/custom/config.user.toml`, since core skills such as brainstorming and research also write into the initiative folder. If you set it on a preview build, move the line.
 * `bmad-preview-ticketing` is now `bmad-ticket`, and the forwarder under the old name is gone. Run `bmad setup`: it updates the skills, moves `_bmad/custom/bmad-preview-ticketing.toml` to `bmad-ticket.toml`, offers to delete the old skill, and offers to install `bmad-ticket`.
+* Web bundles are removed: the `web-bundles/` folder, its packager and its docs pages. Gemini Gems and ChatGPT Custom GPTs are deprecated and are being replaced by skills on both platforms.
 
 ### ✨ Features
 
+* Toolsmith asks no setup questions. A new skill goes where the user's other skills are, named with the user's own prefix rather than `bmad-`, and the read-back says how it registers with `bmad`: its own module record, a member of an installed module, or a plain skill outside the registry.
+* Memory agents built by Toolsmith keep memory as small dated files by subject, with a write-once raw layer for material the owner hands over and distillations that link back to it. Waking loads the agent's self and a generated map, not the memory; the agent tends its memory when session notes build up, without a schedule; and First Breath opens by asking what to call the owner.
+* Review mode gives its findings in chat and in a markdown file; the HTML report is gone.
+* A ticket or epic `id` can be letters and digits, such as `6a`, as well as a number. `tickets.py` accepts it in `tickets.toml`, in a leaf file, in a plan's `ticket`, in `after` (`"6a"`, `"2.6a"`), and in `find`, `pull` and `mark`. A quoted number in `after` is still a tracker id.
 * `bmad setup` cleans up renamed and removed skills. Each module lists them in a `retired.toml` beside its `bmod.toml`; setup offers to delete any still in the project's skills folders, including skills a v6 installer left behind, moves `_bmad/custom/` files to the new name, and says when a customization no longer applies. `removals.txt` is gone.
 * `bmad setup` now moves `_bmad/custom/<old>.toml` and `<old>.user.toml` to a renamed skill's new name without asking, when the new file does not exist yet. It still never changes a value inside a file.
 * `bmad setup` and `bmad status` name the skills of each module you did not install and give one command that installs them.

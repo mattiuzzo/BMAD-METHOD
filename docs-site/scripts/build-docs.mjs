@@ -4,7 +4,7 @@
  * Validates documentation links and builds the Astro+Starlight site.
  *
  * Build output:
- *   build/site/          - Final Astro output (deployable)
+ *   docs-site/dist/      - Final Astro output (deployable)
  */
 
 import { execSync } from 'node:child_process';
@@ -13,7 +13,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validatePublishedImplementationModel } from './validate-published-implementation-model.mjs';
 import { validateRedirects } from './validate-redirects.mjs';
-import { validateLocaleCoverage } from './validate-locale-coverage.mjs';
 
 // =============================================================================
 // Configuration
@@ -21,7 +20,7 @@ import { validateLocaleCoverage } from './validate-locale-coverage.mjs';
 
 const SITE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PROJECT_ROOT = path.resolve(SITE_ROOT, '..');
-const BUILD_DIR = path.join(PROJECT_ROOT, 'build');
+const DIST_DIR = path.join(SITE_ROOT, 'dist');
 
 // =============================================================================
 // Main Entry Point
@@ -44,7 +43,7 @@ async function main() {
   printBanner('BMAD Documentation Build Pipeline');
   console.log();
   console.log(`Project root: ${PROJECT_ROOT}`);
-  console.log(`Build directory: ${BUILD_DIR}`);
+  console.log(`Output directory: ${DIST_DIR}`);
   console.log();
 
   // Check for broken internal links before building
@@ -68,14 +67,14 @@ main().catch((error) => {
 /**
  * Builds the Astro + Starlight site and validates the published implementation model.
  *
- * @returns {string} The filesystem path to the built site directory (e.g., build/site).
+ * @returns {string} The filesystem path to the built site directory (docs-site/dist).
  */
 function buildAstroSite() {
   printHeader('Building Astro + Starlight site');
 
-  const siteDir = path.join(BUILD_DIR, 'site');
+  const siteDir = DIST_DIR;
 
-  // Build Astro site (outputs to build/site via astro.config.mjs)
+  // Build Astro site (outputs to docs-site/dist, Astro's default outDir)
   runAstroBuild();
   console.log('  → Checking published implementation model...');
   validatePublishedImplementationModel(siteDir);
@@ -86,13 +85,6 @@ function buildAstroSite() {
     siteDir,
   });
   console.log(`    ${redirectCount} redirects resolve to built pages`);
-  console.log('  → Checking locale coverage...');
-  const { summary } = validateLocaleCoverage(siteDir, {
-    baselinePath: path.join(SITE_ROOT, 'locale-coverage-baseline.json'),
-  });
-  for (const row of summary) {
-    console.log(`    ${row.locale.padEnd(6)} ${row.translated}/${row.total} translated`);
-  }
 
   console.log();
   console.log(`  \u001B[32m✓\u001B[0m Astro build complete`);
@@ -103,7 +95,7 @@ function buildAstroSite() {
 // =============================================================================
 // Astro Build
 /**
- * Builds the Astro site to build/site (configured in astro.config.mjs).
+ * Builds the Astro site to docs-site/dist (Astro's default outDir).
  */
 function runAstroBuild() {
   console.log('  → Running astro build...');
@@ -172,18 +164,13 @@ function formatFileSize(bytes) {
 // =============================================================================
 // File System Utilities
 /**
- * Remove any existing build output and recreate the build directory.
- *
- * Ensures the configured BUILD_DIR is empty by deleting it if present and then creating a fresh directory.
+ * Remove any existing build output so a build never serves stale pages.
  */
 
 function cleanBuildDirectory() {
   console.log('Cleaning previous build...');
 
-  if (fs.existsSync(BUILD_DIR)) {
-    fs.rmSync(BUILD_DIR, { recursive: true });
-  }
-  fs.mkdirSync(BUILD_DIR, { recursive: true });
+  fs.rmSync(DIST_DIR, { recursive: true, force: true });
 }
 
 // =============================================================================

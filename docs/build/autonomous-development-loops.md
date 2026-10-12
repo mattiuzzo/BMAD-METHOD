@@ -26,6 +26,11 @@ bmad-loop, owns backlog policy and dispatch.
 4. Review the result
 5. Finish by writing a terminal status to the plan file or fallback result artifact
 
+The review runs one `quick` lens by default. Pass `thorough` in the
+invocation, or pin it in `_bmad/custom/bmad-build-auto.toml`.
+Quick is fine inside the loop, but something should probably run a thorough review on  
+every change; see [Review a Change](review-a-change.md#choose-the-depth).
+
 ## Prerequisites
 
 This skill relies on an ability to run subagents. If subagents are unavailable,
@@ -176,6 +181,7 @@ On successful completion, the workflow writes or updates the plan with:
   - Residual risks
 - `followup_review_recommended` flag. True if LLM decided another review pass seems worthwhile. It's a suggestion, not a must. Simplest way to give it a second review pass is to dispatch the same ticket or plan again.
 - `baseline_revision` — the full canonical revision before implementation. `NO_VCS` without version control.
+- `risk` — `low`, `medium`, or `high`, the business impact if the change is wrong, scored at planning. For a ticket it starts from the ticket's risk and is never lower. A CI process can read it to decide how much review the change gets.
 - `deferred` frontmatter entries for review findings triaged `defer`. Each item records `summary`, `evidence`, and, when known, `location` plus `severity`.
 
 The workflow commits but does not push. The working copy is clean at exit.

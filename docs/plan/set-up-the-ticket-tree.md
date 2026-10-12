@@ -109,7 +109,7 @@ UX is the exception to the naming: `bmad-ux` writes two peer documents, `DESIGN.
 
 ## Configure Where Tickets Are Tracked
 
-The first time you use `bmad-ticket`, it asks where tickets are tracked and writes your choice to `_bmad/custom/ticketing-store-config.toml`. That file is yours to edit, and edits survive skill updates.
+Out of the box, tickets are markdown files in the store, and there is nothing to set up. To use a tracker, say "set up the ticket store": `bmad-ticket` writes your choice to `_bmad/custom/ticketing-store-config.toml`. That file holds only what your project sets, such as the tracker's project key. Anything you add to it overrides the skill's default for that tracker, and your edits survive skill updates.
 
 | Choice        | What it means                                                                        |
 | ------------- | ------------------------------------------------------------------------------------ |
@@ -130,7 +130,7 @@ Hooks are not integrated yet, so nothing syncs on its own: a tracker and the tic
 
 ## Use `bmad-ticket`
 
-The skill turns intent into tickets a coding agent can build from, at three levels. An initiative holds epics. An epic holds stories, spikes, and bugs. An initiative or an epic is itself the specification at its level: it holds the requirements, and its children are cut from them.
+The skill turns intent into tickets a coding agent can build from, at three levels. An initiative holds epics. An epic holds stories, spikes, and bugs. An initiative or an epic is itself the specification at its level: it holds the requirements, and its children are cut from them. When the requirements outgrow the ticket, `bmad-spec` writes a spec folder inside that initiative or epic folder.
 
 It takes almost any input. The best input is a `bmad-spec` output together with the documents that produced it. Give it the spec folder and it plans one epic whose stories cite the spec's `CAP-N` ids. A PRD alone, meeting notes, or a one-paragraph idea also work.
 

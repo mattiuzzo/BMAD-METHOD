@@ -4,7 +4,7 @@
 # ///
 """Deterministic Skill Validator
 
-Validates 10 deterministic rules across skill directories.
+Validates 11 deterministic rules across skill directories.
 Acts as a fast first-pass complement to the inference-based skill validator.
 
 What it checks:
@@ -16,6 +16,7 @@ What it checks:
 - SKILL-06: description quality (length, "Use when"/"Use if"; the fixed text for a module record)
 - SKILL-07: SKILL.md has body content after frontmatter
 - PATH-02: no installed_path variable
+- PATH-06: script calls use {skill-root}, not a bare scripts/ path
 - SEQ-02: no time estimates
 - TPL-01: template files must not contain render-time {{ config.* }} / {{ workflow.* }} expressions
 
@@ -55,8 +56,9 @@ TIME_ESTIMATE_PATTERNS = [
     re.compile(r"\bETA\b"),
 ]
 TEMPLATE_FILENAME_REGEX = re.compile(r"template", re.I)
-COMPILE_TIME_SUB_REGEX = re.compile(r"\{\{-?\s*(?:config|workflow)\.[^}]*\}\}")
+COMPILE_TIME_SUB_REGEX = re.compile(r"\{\{-?\s*(?:(?:config|workflow)\.|initiative_folder\b)[^}]*\}\}")
 INSTALLED_PATH_RE = re.compile(r"installed_path", re.I)
+BARE_SCRIPT_RE = re.compile(r"\buv\s+run\b[^`]*?\s(?:\./)?scripts/")
 USE_WHEN_RE = re.compile(r"use\s+when\b", re.I)
 USE_IF_RE = re.compile(r"use\s+if\b", re.I)
 DEPRECATED_RE = re.compile(r"^\s*deprecated\b", re.I)
@@ -230,7 +232,9 @@ def discover_skill_dirs(root_dirs: list[str]) -> list[str]:
                 continue
             full_path = entry.path
             if os.path.exists(os.path.join(full_path, "SKILL.md")):
+                # A SKILL.md further down is a template the skill emits, not a skill.
                 skill_dirs.append(full_path)
+                continue
             walk(full_path)
 
     for root_dir in root_dirs:
@@ -487,6 +491,21 @@ def validate_skill(skill_dir: str) -> list[dict]:
                     )
                 )
 
+        # Unstripped: script calls usually sit in code blocks.
+        for i, line in enumerate(content.split(os.linesep)):
+            if BARE_SCRIPT_RE.search(line):
+                findings.append(
+                    _finding(
+                        "PATH-06",
+                        "Script Calls Must Use {skill-root}",
+                        "HIGH",
+                        rel_file,
+                        "`uv run scripts/...` resolves from the working directory, not the skill.",
+                        "Call the script as `uv run {skill-root}/scripts/...`.",
+                        line=i + 1,
+                    )
+                )
+
     for file_path in all_files:
         ext = os.path.splitext(file_path)[1]
         if ext not in SCAN_EXTENSIONS:
@@ -536,7 +555,7 @@ def validate_skill(skill_dir: str) -> list[dict]:
                         "HIGH",
                         rel_file,
                         f"Template file contains render-time expression `{match.group(0)}` — this would be baked at render time and leak a machine-local value into every spec produced from the template.",
-                        "Remove the `{{ config.key }}` or `{{ workflow.key }}` expression. Use single-curly `{var}` if the value should be resolved at LLM runtime by the consumer of the generated spec.",
+                        "Remove the `{{ config.key }}`, `{{ workflow.key }}` or `{{ initiative_folder }}` expression. Use single-curly `{var}` if the value should be resolved at LLM runtime by the consumer of the generated spec.",
                         line=i + 1,
                     )
                 )

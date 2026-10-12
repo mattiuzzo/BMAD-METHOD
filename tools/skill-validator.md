@@ -10,7 +10,7 @@ Before running inference-based validation, run the deterministic validator:
 uv run --python 3.11 tools/validate_skills.py --json path/to/skill-dir
 ```
 
-This checks 10 rules deterministically: SKILL-01, SKILL-02, SKILL-03, SKILL-04, SKILL-05, SKILL-06, SKILL-07, PATH-02, SEQ-02, TPL-01.
+This checks 11 rules deterministically: SKILL-01, SKILL-02, SKILL-03, SKILL-04, SKILL-05, SKILL-06, SKILL-07, PATH-02, PATH-06, SEQ-02, TPL-01.
 
 Review its JSON output. Skip any rule that produced zero findings — it is already verified. A rule that produced findings still gets reviewed (SKILL-06's what-and-when check benefits from judgment). The 10 rules that need judgment are PATH-01, PATH-03, PATH-04, PATH-05, STEP-04, STEP-05, SEQ-01, REF-01, REF-02, REF-03.
 
@@ -63,6 +63,7 @@ Path resolution differs between the last two; see PATH-01.
 | `{{ workflow.key }}`                     | `render_skill.py`, at render time                                                          | rendered skills only                                                 |
 | `{{ config.key }}`, `{{ config.a.b.c }}` | `render_skill.py`, at render time                                                          | rendered skills only                                                 |
 | `{{ rendered("file.md") }}`              | `render_skill.py`, at render time                                                          | rendered skills only                                                 |
+| `{{ initiative_folder }}`                | `render_skill.py`, at render time                                                          | rendered skills only                                                 |
 | `{{name}}` (no `config.` or `workflow.`) | nothing — survives verbatim into the generated artifact                                    | templates and the artifacts they seed; inside `{% raw %}` in a rendered skill |
 
 The distinction between `{{name}}` and `{{ config.name }}` matters: the first is an artifact placeholder the consumer of the generated document fills in later; the second is a value baked in at render time. See REF-01 and TPL-01.
@@ -83,10 +84,11 @@ Instructions for the full route.
 {% endfor %}
 ```
 
-Templates see four names:
+Templates see five names:
 
 - `config` — the central config. `config.key` is the one scalar with that key anywhere in the merged config (an ambiguous or missing key halts); `config.a.b.c` names an explicit path. `{project-root}` in the value is bound.
 - `workflow` — the effective customization's `[workflow]` table: shipped `customize.toml`, then project and user TOML, then invocation overrides. Each value is validated against the shape of its shipped default. Inserted directly, a string list renders as a Markdown list and a list of lens tables as lens sections, the same output the pre-Jinja2 tokens produced; `{% for %}` iterates either. `{skill-root}` in a value is bound to the generation directory.
+- `initiative_folder` — `config.output_folder`, extended by `/<active_initiative>` when `core.active_initiative` is set in the central config: the folder the project's documents and tickets go to. Reaching it keys the generation like a config value.
 - `rendered("file.md")` — the generation path of another rendered source. The target must be a Markdown file in the skill other than `SKILL.md`, which the renderer excludes.
 - `halt(message)` — stops the render with that message, prefixed by the source and line. Use it to reject a customization value the templates cannot act on, such as a misspelled selector.
 
@@ -127,7 +129,7 @@ Every value reached during the render is part of the generation's identity. Cust
 - **Rule:** The `name` value must be the canonical root skill `bmad`, or start with `bmad-` and use only lowercase letters, numbers, and single hyphens between segments.
 - **Detection:** Regex test: `^(?:bmad|bmad-[a-z0-9]+(?:-[a-z0-9]+)*)$`.
 - **Fix:** Rename to comply with the format (e.g., `bmad-my-skill`).
-- **Module record:** A folder whose `bmod.toml` has a `[bmod]` table and no `[skill]` table is a module record, which nobody runs. Its `name` must start with `bmod-` instead: `^bmod-[a-z0-9]+(?:-[a-z0-9]+)*$`. That the rest of the name is the module code is checked by `tools/validate_manifests.py`.
+- **Module record:** A folder whose `bmod.toml` has a `[bmod]` table and no `[skill]` table is a module record, which nobody runs. Its `name` must start with `bmod-` instead: `^bmod-[a-z0-9]+(?:-[a-z0-9]+)*$`. That the rest of the name is the module code is checked by `skills/bmad/scripts/validate_manifests.py`.
 
 ### SKILL-05 — `name` Must Match Directory Name
 
@@ -215,6 +217,14 @@ Every value reached during the render is part of the generation's identity. Cust
   - If the intent is to invoke the other skill: use invoke language in prose — ``Invoke the `skill-name` skill`` (see REF-03).
   - If the intent is to use a shared resource (template, data file): extract it to a location outside both skills — a config-referenced path such as `{output_folder}/...`, or a `file:`-prefixed entry in `customize.toml` — rather than reaching across a skill boundary.
 
+### PATH-06 — Script Calls Must Use `{skill-root}`
+
+- **Severity:** HIGH
+- **Applies to:** all scanned files, code blocks included
+- **Rule:** A skill runs its own scripts through `{skill-root}`. The agent's working directory is the project, so `uv run scripts/tool.py` does not find the script.
+- **Detection:** Deterministic. Flags `scripts/` or `./scripts/` as a separate argument after `uv run`, whatever options come before it.
+- **Fix:** `uv run {skill-root}/scripts/tool.py`.
+
 ---
 
 ### STEP-04 — Halt Before Menu
@@ -257,8 +267,8 @@ Every value reached during the render is part of the generation's identity. Cust
 
 - **Severity:** HIGH
 - **Applies to:** `.md` files whose name contains `template` (case-insensitive)
-- **Rule:** Template files become artifacts (for example plan files) that are committed and used on other machines. `render_skill.py` would replace a `{{ config.key }}` or `{{ workflow.key }}` expression with a value from the rendering machine, and every artifact produced from the template would carry it.
-- **Detection:** Regex `\{\{-?\s*(?:config|workflow)\.[^}]*\}\}` match anywhere in a file whose basename matches `/template/i`.
+- **Rule:** Template files become artifacts (for example plan files) that are committed and used on other machines. `render_skill.py` would replace a `{{ config.key }}`, `{{ workflow.key }}` or `{{ initiative_folder }}` expression with a value from the rendering machine, and every artifact produced from the template would carry it.
+- **Detection:** Regex `\{\{-?\s*(?:(?:config|workflow)\.|initiative_folder\b)[^}]*\}\}` match anywhere in a file whose basename matches `/template/i`.
 - **Fix:** Remove the expression. Use single-curly `{var}` if the value should be resolved at runtime by the consumer of the generated artifact, or plain double-curly `{{var}}` if it is a placeholder the consumer fills in.
 
 ---
@@ -271,10 +281,10 @@ Every value reached during the render is part of the generation's identity. Cust
   - `{name}` — a frontmatter variable in the same file, a config key, a runtime variable set during execution, or the path anchors `{project-root}` and `{skill-root}`.
   - `{workflow.key}` — must name a key in the `[workflow]` table of the skill's own `customize.toml`.
   - `{agent.key}` — must name a key in the `[agent]` table of the skill's own `customize.toml`.
-  - `{{ workflow.key }}`, `{{ config.key }}`, `{{ rendered("file.md") }}` and `{% %}` tags — only in a rendered skill (one whose SKILL.md invokes `render_skill.py`). In any other skill nothing will render them and they reach the agent verbatim. `workflow.key` must name a key in the skill's own `customize.toml`; a `rendered()` target must name a Markdown file in the skill other than `SKILL.md`, which the renderer excludes from its source set.
+  - `{{ workflow.key }}`, `{{ config.key }}`, `{{ initiative_folder }}`, `{{ rendered("file.md") }}` and `{% %}` tags — only in a rendered skill (one whose SKILL.md invokes `render_skill.py`). In any other skill nothing will render them and they reach the agent verbatim. `workflow.key` must name a key in the skill's own `customize.toml`; a `rendered()` target must name a Markdown file in the skill other than `SKILL.md`, which the renderer excludes from its source set.
 - **Detection:** Collect all tokens in the file and classify them by form. Resolve config keys against the `prompt:` keys in `module.yaml`; resolve `{workflow.*}`, `{agent.*}`, and `workflow.*` expressions against the skill's `customize.toml`. Before flagging a render-time expression, grep the skill's `SKILL.md` for `render_skill.py` — if it is a rendered skill, the expression is legitimate. Flag any token that cannot be traced to a source.
 - **Exceptions:**
-  - Plain double-curly `{{name}}` with **no** `config.` or `workflow.` prefix — an artifact placeholder that survives rendering into the generated document, to be filled in by whoever consumes it (e.g. `{{story_key}}` in a story template). Do not flag these; in a rendered skill they must sit inside `{% raw %}`. `{{ config.key }}` and `{{ workflow.key }}` are **not** covered by this exception; they are render-time expressions governed by the rule above and by TPL-01.
+  - Plain double-curly `{{name}}` with **no** `config.` or `workflow.` prefix — an artifact placeholder that survives rendering into the generated document, to be filled in by whoever consumes it (e.g. `{{story_key}}` in a story template). Do not flag these; in a rendered skill they must sit inside `{% raw %}`. `{{ config.key }}`, `{{ workflow.key }}` and `{{ initiative_folder }}` are **not** covered by this exception; they are render-time expressions governed by the rule above and by TPL-01.
   - Variables inside fenced code blocks that are clearly illustrative examples.
 - **Fix:** Either define the variable in the appropriate `customize.toml` table or frontmatter, or replace the reference with a literal value. If a config key was misspelled, correct the spelling.
 
